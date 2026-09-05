@@ -47,16 +47,45 @@ Para prevenir perda de dados e garantir a segurança do ambiente local:
 3. **Idempotência**: As migrations usam `IF NOT EXISTS` para evitar conflitos, minimizando a necessidade de comandos de reset destrutivos como `supabase db reset`.
 4. **Instância Local vs Remota**: Os comandos `supabase` padrão atuam na instância local (`npx supabase start`). Para apontar para produção, configure o `.env` de acordo e use o `supabase link` antes de fazer pushes remotos.
 
-## Deploy na Vercel
+## Separação de Ambientes (Dev vs Prod)
 
-O aplicativo está configurado para ser implantado facilmente na Vercel. 
-1. Conecte seu repositório do GitHub na Vercel.
-2. Configure as variáveis de ambiente `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` apontando para o seu projeto Supabase em produção.
-3. Não esqueça de publicar sua Edge Function no Supabase também:
+Este projeto segue a arquitetura de **Isolamento de Ambientes**. Existem dois projetos Supabase completamente distintos para evitar que testes e dados falsos se misturem com a produção, ou que resets de banco apaguem dados reais acidentalmente.
+
+### 1. Supabase de Desenvolvimento (Local ou Nuvem Dev)
+- **Uso:** Criação de novas tabelas, testes do agente, mock de transações.
+- **Vercel Preview Deployments:** Qualquer PR no GitHub irá gerar uma URL de Preview que **deve apontar para este banco de desenvolvimento**. 
+
+### 2. Supabase de Produção (Exclusivo)
+- **Uso:** Dados reais dos usuários finais.
+- **Deploy:** A branch `master` é automaticamente implantada na Vercel para Produção e **deve apontar para este banco de produção**.
+
+## Como fazer Deploy para Produção
+
+Se você acabou de criar o **Supabase de Produção**, execute os seguintes passos no terminal para subir a infraestrutura:
+
+1. Autentique-se e linke o projeto apontando para o *Reference ID* da Produção:
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref [REF_DA_PRODUCAO]
+   ```
+2. Empurre as Migrations para a Nuvem de Produção:
+   ```bash
+   npx supabase db push
+   ```
+3. Publique a Edge Function:
    ```bash
    npx supabase functions deploy interpretar
-   npx supabase secrets set OPENAI_API_KEY=sk-...
    ```
+4. Configure as variáveis na Nuvem de Produção:
+   ```bash
+   npx supabase secrets set OPENAI_API_KEY=sk-sua-chave-aqui
+   npx supabase secrets set CORS_ORIGIN=https://seu-app.vercel.app
+   ```
+5. No painel da **Vercel**:
+   - Mude as chaves `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` de Produção para apontarem para as chaves deste novo Supabase.
+   - Mude as chaves do ambiente *Preview* e *Development* para apontarem para o seu Supabase Dev.
+6. No painel do **Supabase Produção** (Authentication > URL Configuration):
+   - Adicione a sua URL final da Vercel (ex: `https://seu-app.vercel.app`) em **Redirect URLs**.
 
 ## Acurácia e Telemetria
 
