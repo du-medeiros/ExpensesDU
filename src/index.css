@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0284c7; /* sky-600 */
+  --color-primary-foreground: #ffffff;
+  --color-despesa: #f97316; /* orange-500 */
+  --color-receita: #0d9488; /* teal-600 */
+  --color-atencao: #f59e0b; /* amber-500 */
+  --color-estouro: #ea580c; /* orange-600 */
+
+  --color-background: #ffffff;
+  --color-foreground: #1f2937; /* gray-800 */
+
+  --color-muted: #f1f5f9; /* slate-100 */
+  --color-muted-foreground: #64748b; /* slate-500 */
+
+  --color-border: #e2e8f0; /* slate-200 */
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme dark {
+  --color-primary: #38bdf8; /* sky-400 */
+  --color-primary-foreground: #000000;
+  --color-despesa: #fdba74; /* orange-300 */
+  --color-receita: #5eead4; /* teal-300 */
+  
+  --color-background: #000000;
+  --color-foreground: #f8fafc; /* slate-50 */
+
+  --color-muted: #1e293b; /* slate-800 */
+  --color-muted-foreground: #94a3b8; /* slate-400 */
+
+  --color-border: #334155; /* slate-700 */
+}
+
+:root {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Global utility for tabular-nums */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Accessibility: Global focus ring & touch target floors */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button, a {
+  @apply min-h-[44px];
+}
+
+button.shrink-0 {
+  @apply min-w-[44px];
+}
+
+/* Reduced motion single animation allowance for confirmation card */
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-card-enter {
+  animation: slideUpFade 0.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .animate-card-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
