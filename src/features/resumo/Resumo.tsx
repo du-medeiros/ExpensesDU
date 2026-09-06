@@ -5,7 +5,7 @@ import { addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { formatDate } from '../../lib/date';
 import { formatCurrency } from '../../lib/currency';
 import { getCategoryName } from '../../lib/categories';
-import { api, Transaction } from '../../lib/api';
+import { api, type Transaction } from '../../lib/api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
@@ -246,10 +246,10 @@ export const Resumo: React.FC = () => {
             <div className="mt-8">
               <h3 className="text-lg font-semibold text-foreground mb-4 px-2">Histórico do Mês</h3>
               <div className="space-y-4">
-                {monthTransactions.length === 0 ? (
+                {transactions.length === 0 ? (
                   <p className="text-muted-foreground text-sm px-2">Nenhuma transação neste período.</p>
                 ) : (
-                  monthTransactions.map(tx => (
+                  transactions.map(tx => (
                     <TransactionCard 
                       key={tx.id} 
                       transaction={tx} 

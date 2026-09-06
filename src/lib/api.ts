@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Database } from '../types/database';
+import type { Database } from '../types/database';
 
 export type Transaction = Omit<Database['public']['Tables']['transactions']['Row'], 'valor'> & { valor: number };
 export type Goal = Omit<Database['public']['Tables']['goals']['Row'], 'valor_limite'> & { valor_teto: number, gasto_atual: number };

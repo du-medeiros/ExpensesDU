@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { format, addMonths, subMonths } from 'date-fns';
+import { addMonths, subMonths } from 'date-fns';
 import { formatDate } from '../../lib/date';
 import { api } from '../../lib/api';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -57,9 +56,9 @@ export const Metas: React.FC = () => {
         .from('goals')
         .upsert({
           user_id: user.id,
-          categoria,
+          categoria: categoria as any,
           mes_referencia: firstDayOfMonth,
-          valor_teto,
+          valor_limite: valor_teto,
         }, { onConflict: 'user_id, categoria, mes_referencia' });
 
       if (error) throw error;
