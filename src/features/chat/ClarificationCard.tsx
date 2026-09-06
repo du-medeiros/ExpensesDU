@@ -28,7 +28,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ question, 
             <button
               key={cat}
               onClick={() => onSelect(cat)}
-              className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-orange-300 dark:border-orange-700 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-orange-100 dark:hover:bg-orange-800/50 transition-colors capitalize"
+              className="px-3 py-1.5 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-colors capitalize"
             >
               {cat}
             </button>
@@ -37,8 +37,8 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ question, 
       ) : (
         <div className="flex gap-2">
            {/* Fallback to simple Yes/No or just let the user know they need to type in the main input if we can't show chips */}
-           <button onClick={() => onSelect('Sim')} className="px-4 py-2 bg-white dark:bg-slate-800 border border-orange-300 rounded-full text-sm font-medium text-slate-700 hover:bg-orange-100">Sim</button>
-           <button onClick={() => onSelect('Não')} className="px-4 py-2 bg-white dark:bg-slate-800 border border-orange-300 rounded-full text-sm font-medium text-slate-700 hover:bg-orange-100">Não</button>
+           <button onClick={() => onSelect('Sim')} className="px-4 py-2 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted">Sim</button>
+           <button onClick={() => onSelect('Não')} className="px-4 py-2 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted">Não</button>
         </div>
       )}
     </div>

@@ -55,13 +55,13 @@ export const Metas: React.FC = () => {
       {/* Header / Month Selector */}
       <div className="bg-background p-4 border-b border-border sticky top-0 z-10">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          <button onClick={handlePrevMonth} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+          <button onClick={handlePrevMonth} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <h2 className="text-lg font-semibold text-foreground capitalize">
             {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
           </h2>
-          <button onClick={handleNextMonth} className="p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+          <button onClick={handleNextMonth} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ChevronRight className="w-6 h-6" />
           </button>
         </div>
@@ -70,7 +70,7 @@ export const Metas: React.FC = () => {
       <div className="flex-1 p-4 max-w-md mx-auto w-full pb-24">
         {goals.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center mt-12 px-4 space-y-2">
-            <h3 className="text-lg font-semibold text-foreground">Nenhum teto definido</h3>
+            <h3 className="text-lg font-semibold text-foreground">Sem metas este mês</h3>
             <p className="text-muted-foreground text-sm">
               Peça para o agente criar um limite (ex: "Meta de 400 em mercado").
             </p>
@@ -86,6 +86,7 @@ export const Metas: React.FC = () => {
                 categoria={g.categoria}
                 valorTeto={g.valor_teto}
                 gastoAtual={g.gasto_atual}
+                tipo={g.tipo}
               />
             ))}
           </div>

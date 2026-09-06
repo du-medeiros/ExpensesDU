@@ -72,12 +72,10 @@ export const MessageList: React.FC<MessageListProps> = ({
       })}
 
       {isTyping && (
-        <div className="flex flex-col items-start">
-          <div className="max-w-[85%] rounded-2xl rounded-bl-none px-4 py-3 bg-muted flex gap-1">
-            <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '300ms' }} />
-          </div>
+        <div className="flex gap-1 items-center px-4 py-3 bg-background border border-border rounded-2xl rounded-tl-sm shadow-sm w-fit">
+          <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
       )}
       

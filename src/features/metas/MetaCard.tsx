@@ -4,6 +4,7 @@ interface MetaCardProps {
   categoria: string;
   valorTeto: number;
   gastoAtual: number;
+  tipo?: 'despesa' | 'receita';
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -17,22 +18,32 @@ const CATEGORY_COLORS: Record<string, string> = {
   outros: '#64748b'
 };
 
-export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoAtual }) => {
+export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoAtual, tipo = 'despesa' }) => {
   const percentage = Math.min((gastoAtual / valorTeto) * 100, 100);
   const isOver = gastoAtual > valorTeto;
+  const isReceita = tipo === 'receita';
 
-  let statusText = 'Dentro do limite';
-  let statusColorClass = 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300';
-  let barColorClass = 'bg-primary';
+  let statusText = isReceita ? 'Em andamento' : 'Dentro do limite';
+  let statusColorClass = 'text-muted-foreground bg-muted';
+  let barColorClass = isReceita ? 'bg-receita' : 'bg-primary';
 
-  if (isOver) {
-    statusText = 'Estourou o teto';
-    statusColorClass = 'text-estouro bg-red-100 dark:bg-red-900/30';
-    barColorClass = 'bg-estouro';
-  } else if (percentage >= 70) {
-    statusText = 'Atenção, quase lá';
-    statusColorClass = 'text-atencao bg-amber-100 dark:bg-amber-900/30';
-    barColorClass = 'bg-atencao';
+  if (isReceita) {
+    if (percentage >= 100) {
+      statusText = 'Meta alcançada!';
+      statusColorClass = 'text-receita bg-receita/10';
+    } else if (percentage >= 50) {
+      statusText = 'Mais da metade';
+    }
+  } else {
+    if (isOver) {
+      statusText = 'Estourou o teto';
+      statusColorClass = 'text-estouro bg-estouro/10';
+      barColorClass = 'bg-estouro';
+    } else if (percentage >= 70) {
+      statusText = 'Atenção, quase lá';
+      statusColorClass = 'text-atencao bg-atencao/10';
+      barColorClass = 'bg-atencao';
+    }
   }
 
   const formatCurrency = (val: number) => 
@@ -49,7 +60,9 @@ export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoA
             {categoria.substring(0, 1).toUpperCase()}
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white capitalize">{categoria}</h3>
+            <h3 className="font-semibold text-foreground capitalize">
+              {categoria} {isReceita && <span className="text-xs font-normal text-muted-foreground ml-1">(Poupança)</span>}
+            </h3>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${statusColorClass}`}>
               {statusText}
             </span>
@@ -61,7 +74,7 @@ export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoA
         </div>
       </div>
       
-      <div className="w-full h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
         <div 
           className={`h-full rounded-full transition-all duration-500 ${barColorClass}`} 
           style={{ width: `${percentage}%` }}

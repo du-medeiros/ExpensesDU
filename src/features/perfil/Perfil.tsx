@@ -129,29 +129,29 @@ export const Perfil: React.FC = () => {
           <User className="w-8 h-8 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Seu Perfil</h1>
-          <p className="text-slate-500 dark:text-slate-400">Gerencie suas informações e preferências</p>
+          <h1 className="text-2xl font-bold text-foreground">Seu Perfil</h1>
+          <p className="text-muted-foreground">Gerencie suas informações e preferências</p>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-background rounded-xl shadow-sm border border-border overflow-hidden">
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
           <div className="space-y-4">
             <div>
-              <label htmlFor="nome" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label htmlFor="nome" className="block text-sm font-medium text-foreground">
                 Nome de exibição
               </label>
               <input
                 id="nome"
                 type="text"
                 {...register('nome')}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 bg-white text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 bg-background text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               />
               {errors.nome && <p className="mt-1 text-sm text-red-500">{errors.nome.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="whatsapp" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label htmlFor="whatsapp" className="block text-sm font-medium text-foreground">
                 WhatsApp (Opcional, com DDI e DDD)
               </label>
               <input
@@ -159,19 +159,19 @@ export const Perfil: React.FC = () => {
                 type="text"
                 placeholder="+5511999999999"
                 {...register('whatsapp')}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 bg-white text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 bg-background text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               />
               {errors.whatsapp && <p className="mt-1 text-sm text-red-500">{errors.whatsapp.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="timezone" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label htmlFor="timezone" className="block text-sm font-medium text-foreground">
                 Fuso Horário
               </label>
               <select
                 id="timezone"
                 {...register('timezone')}
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 bg-white text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-primary sm:text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 bg-background text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
               >
                 <option value="America/Sao_Paulo">Horário de Brasília (America/Sao_Paulo)</option>
                 <option value="America/Manaus">Amazonas (America/Manaus)</option>
@@ -186,7 +186,7 @@ export const Perfil: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-end pt-4 border-t border-border">
             <button
               type="submit"
               disabled={isSaving}
@@ -210,7 +210,7 @@ export const Perfil: React.FC = () => {
         <div className="flex justify-between gap-4">
         <button
           onClick={handleLogout}
-          className="inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+          className="inline-flex justify-center items-center px-4 py-2 border border-border shadow-sm text-sm font-medium rounded-md text-foreground bg-background hover:bg-muted"
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sair da Conta
@@ -219,7 +219,7 @@ export const Perfil: React.FC = () => {
         {!showDeleteConfirm ? (
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex justify-center items-center px-4 py-2 border border-red-300 dark:border-red-900 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-400 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/30"
+            className="inline-flex justify-center items-center px-4 py-2 border border-estouro/30 shadow-sm text-sm font-medium rounded-md text-estouro bg-background hover:bg-estouro/10"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Excluir minha conta
@@ -237,7 +237,7 @@ export const Perfil: React.FC = () => {
             <button
               onClick={() => setShowDeleteConfirm(false)}
               disabled={isDeleting}
-              className="inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              className="inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Cancelar
             </button>

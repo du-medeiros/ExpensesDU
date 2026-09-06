@@ -158,8 +158,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, o
 
         {/* Date Chip */}
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-500" />
-          <span className="text-sm text-slate-600 dark:text-slate-400">{formatDate(transaction.data)}</span>
+          <Calendar className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">{formatDate(transaction.data)}</span>
         </div>
       </div>
     </div>
