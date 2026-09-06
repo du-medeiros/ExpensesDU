@@ -44,12 +44,18 @@ export const Chat: React.FC = () => {
           
         if (error) throw error;
         
-        const formatted = (data || []).map(msg => ({
-          ...msg,
-          transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
-            ? msg.transaction[0] as Transaction 
-            : (msg.transaction as unknown as Transaction) || null
-        })).reverse(); // Inverte para manter a ordem cronológica no chat
+        const formatted = (data || []).map(msg => {
+          const rawTx = msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
+            ? msg.transaction[0] 
+            : (msg.transaction || null);
+            
+          const tx = rawTx ? { ...rawTx, valor: typeof rawTx.valor === 'string' ? parseFloat(rawTx.valor) : (rawTx.valor || 0) } : null;
+          
+          return {
+            ...msg,
+            transaction: tx as unknown as Transaction
+          };
+        }).reverse(); // Inverte para manter a ordem cronológica no chat
         
         setMessages(formatted as ChatMessageWithTransaction[]);
         setHasMore((data || []).length === 50);
@@ -83,12 +89,18 @@ export const Chat: React.FC = () => {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        const formatted = data.map(msg => ({
-          ...msg,
-          transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
-            ? msg.transaction[0] as Transaction 
-            : (msg.transaction as unknown as Transaction) || null
-        })).reverse();
+        const formatted = data.map(msg => {
+          const rawTx = msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
+            ? msg.transaction[0] 
+            : (msg.transaction || null);
+            
+          const tx = rawTx ? { ...rawTx, valor: typeof rawTx.valor === 'string' ? parseFloat(rawTx.valor) : (rawTx.valor || 0) } : null;
+          
+          return {
+            ...msg,
+            transaction: tx as unknown as Transaction
+          };
+        }).reverse();
         
         setMessages(prev => [...formatted as ChatMessageWithTransaction[], ...prev]);
         setHasMore(data.length === 50);
@@ -161,39 +173,63 @@ export const Chat: React.FC = () => {
 
       const result = await response.json();
       
-      // Fetch the newly created assistant messages from db to get full relations (or construct optimistic)
-      if (result.assistant_message_ids && result.assistant_message_ids.length > 0) {
-        const { data: newAssistantMsgs, error: fetchError } = await supabase
-          .from('chat_messages')
-          .select(`
-            *,
-            transaction:transactions(*)
-          `)
-          .in('id', result.assistant_message_ids)
-          .order('created_at', { ascending: true });
-          
-        if (!fetchError && newAssistantMsgs) {
-          const formattedMsgs = newAssistantMsgs.map(msg => ({
-            ...msg,
-            transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
-              ? msg.transaction[0] as Transaction 
-              : (msg.transaction as unknown as Transaction) || null
-          })) as ChatMessageWithTransaction[];
-          
-          setMessages(prev => [...prev, ...formattedMsgs]);
+      // Construct the main assistant message directly from response
+      const mainTx = result.transacoes_criadas && result.transacoes_criadas.length > 0 ? result.transacoes_criadas[0] : null;
+      if (mainTx) {
+         mainTx.valor = typeof mainTx.valor === 'string' ? parseFloat(mainTx.valor) : (mainTx.valor || 0);
+      }
+      
+      const mainAssistantMsg: ChatMessageWithTransaction = {
+        id: result.assistant_message_id || crypto.randomUUID(),
+        user_id: user.id,
+        papel: 'assistant',
+        conteudo: result.resposta,
+        transaction_id: mainTx ? mainTx.id : null,
+        created_at: new Date().toISOString(),
+        transaction: mainTx,
+        pergunta: result.pergunta || null,
+      };
+
+      const additionalMsgs: ChatMessageWithTransaction[] = [];
+      if (result.transacoes_criadas && result.transacoes_criadas.length > 1) {
+        for (let i = 1; i < result.transacoes_criadas.length; i++) {
+          const t = result.transacoes_criadas[i];
+          t.valor = typeof t.valor === 'string' ? parseFloat(t.valor) : (t.valor || 0);
+          additionalMsgs.push({
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            papel: 'assistant',
+            conteudo: ' ',
+            transaction_id: t.id,
+            created_at: new Date().toISOString(),
+            transaction: t,
+          });
         }
       }
 
+      setMessages(prev => [...prev, mainAssistantMsg, ...additionalMsgs]);
+
     } catch (error: any) {
       console.error('Send error:', error);
-      // Rollback
+      // Rollback optimistic user message
       setMessages(prev => prev.filter(m => m.id !== clientMsgId));
       setInput(text);
-      if (error.name === 'AbortError') {
-        toast.error('Tempo limite excedido. Tente novamente.');
-      } else {
-        toast.error(error.message || 'Falha ao enviar mensagem.');
-      }
+      
+      const errorMessage = error.name === 'AbortError'
+        ? '⚠️ Tempo limite excedido. Tente novamente.'
+        : '⚠️ Falha de conexão ao enviar mensagem. Tente novamente.';
+        
+      const errorMsg: ChatMessageWithTransaction = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        papel: 'assistant',
+        conteudo: errorMessage,
+        transaction_id: null,
+        created_at: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, errorMsg]);
+      toast.error(errorMessage);
     } finally {
       setIsTyping(false);
       inputRef.current?.focus();

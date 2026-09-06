@@ -26,7 +26,43 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const prevMessagesLength = useRef(messages.length);
+  const prevScrollHeight = useRef<number>(0);
+  
+  // Intersection Observer for infinite scroll to top
+  useEffect(() => {
+    if (!topSentinelRef.current || !hasMore || loadingMore || !onLoadMore) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          if (containerRef.current) {
+             prevScrollHeight.current = containerRef.current.scrollHeight;
+          }
+          onLoadMore();
+        }
+      },
+      { root: containerRef.current, threshold: 0.1 }
+    );
+    
+    observer.observe(topSentinelRef.current);
+    
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore]);
+
+  // Adjust scroll position after prepending older messages
+  useEffect(() => {
+    if (containerRef.current && prevMessagesLength.current > 0 && messages.length > prevMessagesLength.current) {
+      // If we prepended messages (i.e. first message changed or just more messages but last user message wasn't the trigger)
+      const isNewUserMsg = messages[messages.length - 1]?.papel === 'user';
+      if (!isNewUserMsg && containerRef.current.scrollHeight > prevScrollHeight.current) {
+         // Restore scroll position
+         const diff = containerRef.current.scrollHeight - prevScrollHeight.current;
+         containerRef.current.scrollTop += diff;
+      }
+    }
+  }, [messages]);
 
   useEffect(() => {
     // Só desce a tela se for uma mensagem nova sendo adicionada (ou inicial)
@@ -41,15 +77,13 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   return (
     <div ref={containerRef} className="flex-1 w-full overflow-y-auto px-4 py-6 space-y-6">
-      {hasMore && (
+      <div ref={topSentinelRef} className="h-4 w-full flex-shrink-0" />
+      {hasMore && loadingMore && (
         <div className="flex justify-center pb-4">
-          <button 
-            onClick={onLoadMore} 
-            disabled={loadingMore}
-            className="px-4 py-2 bg-muted text-muted-foreground hover:bg-border text-sm rounded-full transition-colors disabled:opacity-50"
-          >
-            {loadingMore ? 'Carregando...' : 'Carregar anteriores'}
-          </button>
+          <div className="text-muted-foreground text-sm flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            Carregando anteriores...
+          </div>
         </div>
       )}
 
@@ -62,13 +96,22 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((msg, index) => {
         const isUser = msg.papel === 'user';
         
-        // If it's the last message, from assistant, and has no transaction, but asks a question (or starts with a question mark?), we might show a clarification card
-        // Actually, the PRD says: "Confiança abaixo de 0,80 exibe a pergunta com chips de resposta clicáveis". 
-        // Render ClarificationCard only if the assistant explicitly asks about category
         const isLastAssistantMessage = index === messages.length - 1 && !isUser;
-        const lowerContent = msg.conteudo ? msg.conteudo.toLowerCase() : '';
-        const isCategoryQuestion = lowerContent.includes('categoria') || lowerContent.includes('tipo de gasto') || lowerContent.includes('com o que');
-        const needsClarification = isLastAssistantMessage && !msg.transaction_id && isCategoryQuestion;
+        
+        let needsClarification = false;
+        let clarificationQuestion = msg.conteudo || '';
+        let clarificationOptions: string[] | undefined = undefined;
+
+        if (isLastAssistantMessage) {
+           if (msg.pergunta) {
+             needsClarification = true;
+             clarificationQuestion = msg.pergunta.texto;
+             clarificationOptions = msg.pergunta.opcoes;
+           } else if (!msg.transaction_id && msg.conteudo?.includes('?')) {
+             needsClarification = true;
+             clarificationOptions = ['alimentacao', 'transporte', 'moradia', 'saude', 'lazer', 'compras', 'contas', 'outros'];
+           }
+        }
 
         return (
           <div key={msg.id || index} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
@@ -90,7 +133,8 @@ export const MessageList: React.FC<MessageListProps> = ({
 
             {needsClarification && (
               <ClarificationCard 
-                question={msg.conteudo}
+                question={clarificationQuestion}
+                options={clarificationOptions}
                 onSelect={onClarificationSelect}
               />
             )}

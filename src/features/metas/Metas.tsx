@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { format, addMonths, subMonths } from 'date-fns';
 import { formatDate } from '../../lib/date';
+import { api } from '../../lib/api';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { MetaCard } from './MetaCard';
 import { GoalFormModal } from './GoalFormModal';
@@ -25,11 +26,8 @@ export const Metas: React.FC = () => {
     setLoading(true);
     try {
       const formattedDate = formatDate(currentDate, 'yyyy-MM-dd');
-      const { data, error } = await supabase
-        .rpc('get_or_create_monthly_goals', { p_date: formattedDate });
-      
-      if (error) throw error;
-      setGoals((data as any[]) || []);
+      const data = await api.getMonthlyGoals(formattedDate);
+      setGoals(data || []);
     } catch (err) {
       console.error('Error loading goals', err);
       toast.error('Erro ao carregar metas');

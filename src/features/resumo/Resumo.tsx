@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { addMonths, subMonths } from 'date-fns';
+import { addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { formatDate } from '../../lib/date';
 import { formatCurrency } from '../../lib/currency';
 import { getCategoryName } from '../../lib/categories';
+import { api, Transaction } from '../../lib/api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,7 +27,7 @@ export const Resumo: React.FC = () => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [data, setData] = useState<any>(null);
-  const [monthTransactions, setMonthTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const { trackEvent } = useTelemetry();
 
@@ -41,27 +41,16 @@ export const Resumo: React.FC = () => {
       setLoading(true);
       try {
         const formattedDate = formatDate(currentDate, 'yyyy-MM-dd');
-        const { data: summaryData, error } = await supabase
-          .rpc('get_monthly_summary', { p_date: formattedDate });
+        const start = formatDate(startOfMonth(currentDate), 'yyyy-MM-dd');
+        const end = formatDate(endOfMonth(currentDate), 'yyyy-MM-dd');
+
+        const [summaryData, txData] = await Promise.all([
+          api.getMonthlySummary(formattedDate),
+          api.getMonthTransactions(start, end)
+        ]);
         
-        if (error) throw error;
         setData(summaryData);
-
-        const startOfMonth = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), 'yyyy-MM-dd');
-        const endOfMonth = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0), 'yyyy-MM-dd');
-
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('data', startOfMonth)
-          .lte('data', endOfMonth)
-          .order('data', { ascending: false })
-          .order('created_at', { ascending: false });
-          
-        if (txError) throw txError;
-        setMonthTransactions(txData || []);
-        
+        setTransactions(txData);
       } catch (err) {
         console.error('Error loading summary', err);
         toast.error('Erro ao carregar resumo');
@@ -73,13 +62,12 @@ export const Resumo: React.FC = () => {
   }, [user, currentDate]);
 
   const handleUpdateTransaction = (updated: any) => {
-    setMonthTransactions(prev => prev.map(t => t.id === updated.id ? updated : t));
-    // Trigger a refresh of the summary data
+    setTransactions(prev => prev.map(t => t.id === updated.id ? updated : t));
     setCurrentDate(new Date(currentDate.getTime())); 
   };
 
   const handleDeleteTransaction = (id: string) => {
-    setMonthTransactions(prev => prev.filter(t => t.id !== id));
+    setTransactions(prev => prev.filter(t => t.id !== id));
     setCurrentDate(new Date(currentDate.getTime()));
   };
 
