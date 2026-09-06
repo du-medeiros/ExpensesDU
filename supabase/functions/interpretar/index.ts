@@ -175,6 +175,7 @@ REGRAS OBRIGATÓRIAS:
 - Tipos de transação ou metas: "despesa" (padrão) ou "receita".
 - Se o usuário mencionar algo como "ganhei 500 de salário" ou "recebi", registre como TIPO="receita" e CATEGORIA="outros".
 - Se o usuário falar sobre "guardar", "juntar", "investir", "poupar", "meta", ou "teto" referindo-se a um objetivo/limite, defina intencao="meta". Limites de gasto = "despesa", economias = "receita".
+- PARA A INTENÇÃO "meta", OS DADOS DA META (valor, categoria, tipo) DEVEM OBRIGATORIAMENTE SER PREENCHIDOS DENTRO DO ARRAY 'transacoes'.
 - Se o usuário apenas perguntar sobre seu saldo ou metas, defina intencao="conversa" e use o CONTEXTO DO USUÁRIO para responder informativamente.
 - Múltiplos valores na frase (ex: "mercado 120 e farmácia 40") = gerar MÚLTIPLAS transações separadas na saída.
 - Data: A data atual do cliente é ${dataCliente} (Timezone: ${timezone}).
@@ -194,11 +195,11 @@ GUIA DE CATEGORIAS:
 - "outros": presentes, doações, veterinário, ração, petshop, cursos. TUDO que não couber nas acima é "outros". Se o usuário comprou algo para um animal, use "outros". Presente = "outros".
 
 Intenções possíveis:
-  1. "registrar" -> para registro de gastos/ganhos. (Mesmo faltando dados, se for gasto/ganho é 'registrar')
+  1. "registrar" -> APENAS para registro de gastos ou ganhos reais que já ocorreram no dia a dia.
   2. "consultar" -> ex: "quanto gastei?", "maior gasto". (Neste caso transacoes=[]).
-  3. "meta" -> ex: "limite de 400 em comida", "quero gastar no máximo 400", "quero poupar 1000" (tipo="receita").
+  3. "meta" -> ex: "quero juntar 400", "limite de 400 em comida", "quero gastar no máximo 400", "quero poupar 1000". (Use meta SEMPRE que o usuário expressar um desejo de alcançar, poupar ou limitar um valor).
   4. "corrigir" -> ex: "na verdade foi 40", referindo a gasto anterior.
-  5. "conversa" -> ex: "oi", "obrigado". (Neste caso transacoes=[], resposta pode conter algo amigável).
+  5. "conversa" -> ex: "oi", "obrigado", "quais são minhas metas". (Neste caso transacoes=[], resposta pode conter algo amigável e usar o CONTEXTO DO USUÁRIO).
 
 Retorne ESTRITAMENTE o JSON conforme o schema.`;
 
