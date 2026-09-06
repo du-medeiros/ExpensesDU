@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { format, addMonths, subMonths } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { addMonths, subMonths } from 'date-fns';
+import { formatDate } from '../../lib/date';
+import { formatCurrency } from '../../lib/currency';
+import { getCategoryName } from '../../lib/categories';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTelemetry } from '../../hooks/useTelemetry';
+import { TransactionCard } from '../chat/TransactionCard';
 
 const CATEGORY_COLORS: Record<string, string> = {
   alimentacao: '#f97316', // orange
@@ -24,6 +27,7 @@ export const Resumo: React.FC = () => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [data, setData] = useState<any>(null);
+  const [monthTransactions, setMonthTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { trackEvent } = useTelemetry();
 
@@ -36,12 +40,28 @@ export const Resumo: React.FC = () => {
       if (!user) return;
       setLoading(true);
       try {
-        const formattedDate = format(currentDate, 'yyyy-MM-dd');
+        const formattedDate = formatDate(currentDate, 'yyyy-MM-dd');
         const { data: summaryData, error } = await supabase
           .rpc('get_monthly_summary', { p_date: formattedDate });
         
         if (error) throw error;
         setData(summaryData);
+
+        const startOfMonth = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), 'yyyy-MM-dd');
+        const endOfMonth = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0), 'yyyy-MM-dd');
+
+        const { data: txData, error: txError } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('data', startOfMonth)
+          .lte('data', endOfMonth)
+          .order('data', { ascending: false })
+          .order('created_at', { ascending: false });
+          
+        if (txError) throw txError;
+        setMonthTransactions(txData || []);
+        
       } catch (err) {
         console.error('Error loading summary', err);
         toast.error('Erro ao carregar resumo');
@@ -52,11 +72,19 @@ export const Resumo: React.FC = () => {
     loadData();
   }, [user, currentDate]);
 
+  const handleUpdateTransaction = (updated: any) => {
+    setMonthTransactions(prev => prev.map(t => t.id === updated.id ? updated : t));
+    // Trigger a refresh of the summary data
+    setCurrentDate(new Date(currentDate.getTime())); 
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    setMonthTransactions(prev => prev.filter(t => t.id !== id));
+    setCurrentDate(new Date(currentDate.getTime()));
+  };
+
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   if (loading && !data) {
     return (
@@ -92,7 +120,7 @@ export const Resumo: React.FC = () => {
             <ChevronLeft className="w-6 h-6" />
           </button>
           <h2 className="text-lg font-semibold text-foreground capitalize">
-            {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+            {formatDate(currentDate, 'MMMM yyyy')}
           </h2>
           <button onClick={handleNextMonth} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ChevronRight className="w-6 h-6" />
@@ -159,7 +187,7 @@ export const Resumo: React.FC = () => {
               <div className="bg-background rounded-2xl p-6 shadow-sm border border-border">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Gastos por Categoria</h3>
                 <div className="h-64 relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="99%" height="100%">
                     <PieChart>
                       <Pie
                         data={data.por_categoria}
@@ -181,12 +209,18 @@ export const Resumo: React.FC = () => {
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
                         itemStyle={{ color: 'var(--color-foreground)' }}
                       />
+                      <Legend 
+                        layout="horizontal" 
+                        verticalAlign="bottom" 
+                        align="center"
+                        formatter={(value) => <span className="text-foreground">{getCategoryName(value)}</span>}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   {/* Center text for Donut */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
                     <span className="text-xs text-muted-foreground font-medium uppercase">Despesas</span>
-                    <span className="text-lg font-bold text-foreground">{formatCurrency(totalDespesas)}</span>
+                    <span className="text-lg font-bold text-foreground tabular-nums">{formatCurrency(totalDespesas)}</span>
                   </div>
                 </div>
               </div>
@@ -208,10 +242,10 @@ export const Resumo: React.FC = () => {
                         </div>
                         <div>
                           <p className="font-medium text-foreground line-clamp-1 capitalize">{item.descricao}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{item.categoria} • {format(new Date(item.data), 'dd MMM', { locale: ptBR })}</p>
+                          <p className="text-xs text-muted-foreground">{getCategoryName(item.categoria)} • {formatDate(item.data, 'dd MMM')}</p>
                         </div>
                       </div>
-                      <div className="font-semibold text-foreground whitespace-nowrap ml-2">
+                      <div className="font-semibold text-foreground whitespace-nowrap ml-2 tabular-nums">
                         {formatCurrency(item.valor)}
                       </div>
                     </div>
@@ -219,6 +253,25 @@ export const Resumo: React.FC = () => {
                 </div>
               </div>
             )}
+            
+            {/* Histórico Completo do Mês */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-foreground mb-4 px-2">Histórico do Mês</h3>
+              <div className="space-y-4">
+                {monthTransactions.length === 0 ? (
+                  <p className="text-muted-foreground text-sm px-2">Nenhuma transação neste período.</p>
+                ) : (
+                  monthTransactions.map(tx => (
+                    <TransactionCard 
+                      key={tx.id} 
+                      transaction={tx} 
+                      onUpdate={handleUpdateTransaction}
+                      onDelete={handleDeleteTransaction}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>

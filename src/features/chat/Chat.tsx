@@ -13,6 +13,8 @@ export const Chat: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -37,20 +39,20 @@ export const Chat: React.FC = () => {
             transaction:transactions(*)
           `)
           .eq('user_id', user.id)
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(50);
           
         if (error) throw error;
         
-        // Formata os dados para o tipo correto, extraindo o array de transactions
         const formatted = (data || []).map(msg => ({
           ...msg,
           transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
             ? msg.transaction[0] as Transaction 
             : (msg.transaction as unknown as Transaction) || null
-        }));
+        })).reverse(); // Inverte para manter a ordem cronológica no chat
         
         setMessages(formatted as ChatMessageWithTransaction[]);
+        setHasMore((data || []).length === 50);
       } catch (err) {
         console.error('Erro ao carregar histórico:', err);
       } finally {
@@ -59,6 +61,46 @@ export const Chat: React.FC = () => {
     }
     loadHistory();
   }, [user]);
+
+  const handleLoadMore = async () => {
+    if (!user || messages.length === 0 || loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    const oldestMessageDate = messages[0].created_at;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select(`
+          *,
+          transaction:transactions(*)
+        `)
+        .eq('user_id', user.id)
+        .lt('created_at', oldestMessageDate)
+        .order('created_at', { ascending: false })
+        .limit(50);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const formatted = data.map(msg => ({
+          ...msg,
+          transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
+            ? msg.transaction[0] as Transaction 
+            : (msg.transaction as unknown as Transaction) || null
+        })).reverse();
+        
+        setMessages(prev => [...formatted as ChatMessageWithTransaction[], ...prev]);
+        setHasMore(data.length === 50);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar mais mensagens:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleSend = async (text: string) => {
     if (!text.trim() || !user) return;
@@ -119,26 +161,26 @@ export const Chat: React.FC = () => {
 
       const result = await response.json();
       
-      // Fetch the newly created assistant message from db to get full relations (or construct optimistic)
-      if (result.assistant_message_id) {
-        const { data: newAssistantMsg, error: fetchError } = await supabase
+      // Fetch the newly created assistant messages from db to get full relations (or construct optimistic)
+      if (result.assistant_message_ids && result.assistant_message_ids.length > 0) {
+        const { data: newAssistantMsgs, error: fetchError } = await supabase
           .from('chat_messages')
           .select(`
             *,
             transaction:transactions(*)
           `)
-          .eq('id', result.assistant_message_id)
-          .single();
+          .in('id', result.assistant_message_ids)
+          .order('created_at', { ascending: true });
           
-        if (!fetchError && newAssistantMsg) {
-           const formatted = {
-            ...newAssistantMsg,
-            transaction: newAssistantMsg.transaction && Array.isArray(newAssistantMsg.transaction) && newAssistantMsg.transaction.length > 0 
-              ? newAssistantMsg.transaction[0] as Transaction 
-              : (newAssistantMsg.transaction as unknown as Transaction) || null
-          } as ChatMessageWithTransaction;
+        if (!fetchError && newAssistantMsgs) {
+          const formattedMsgs = newAssistantMsgs.map(msg => ({
+            ...msg,
+            transaction: msg.transaction && Array.isArray(msg.transaction) && msg.transaction.length > 0 
+              ? msg.transaction[0] as Transaction 
+              : (msg.transaction as unknown as Transaction) || null
+          })) as ChatMessageWithTransaction[];
           
-          setMessages(prev => [...prev, formatted]);
+          setMessages(prev => [...prev, ...formattedMsgs]);
         }
       }
 
@@ -233,6 +275,9 @@ export const Chat: React.FC = () => {
           onUpdateTransaction={handleUpdateTransaction}
           onDeleteTransaction={handleDeleteTransaction}
           onClarificationSelect={(answer) => handleSend(answer)}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={handleLoadMore}
         />
       )}
 

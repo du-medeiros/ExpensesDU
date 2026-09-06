@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Wallet, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const loginSchema = z.object({
   email: z.string().email('Formato de e-mail inválido'),
@@ -21,6 +22,13 @@ export const Login: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+  const { session } = useAuth();
+
+  React.useEffect(() => {
+    if (session) {
+      navigate('/app');
+    }
+  }, [session, navigate]);
 
   const onSubmit = async (data: LoginForm) => {
     setIsSubmitting(true);

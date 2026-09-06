@@ -25,6 +25,7 @@ export const Perfil: React.FC = () => {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteEmail, setDeleteEmail] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
@@ -207,43 +208,71 @@ export const Perfil: React.FC = () => {
           {isDark ? 'Tema Claro' : 'Tema Escuro'}
         </button>
 
-        <div className="flex justify-between gap-4">
-        <button
-          onClick={handleLogout}
-          className="inline-flex justify-center items-center px-4 py-2 border border-border shadow-sm text-sm font-medium rounded-md text-foreground bg-background hover:bg-muted"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Sair da Conta
-        </button>
-
-        {!showDeleteConfirm ? (
+        <div className="flex justify-start">
           <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex justify-center items-center px-4 py-2 border border-estouro/30 shadow-sm text-sm font-medium rounded-md text-estouro bg-background hover:bg-estouro/10"
+            onClick={handleLogout}
+            className="inline-flex justify-center items-center px-4 py-2 border border-border shadow-sm text-sm font-medium rounded-md text-foreground bg-background hover:bg-muted"
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Excluir minha conta
+            <LogOut className="w-4 h-4 mr-2" />
+            Sair da Conta
           </button>
-        ) : (
-          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="mt-12 pt-8 border-t border-red-200 dark:border-red-900/30">
+        <h3 className="text-lg font-medium text-red-600 dark:text-red-400 flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-5 h-5" />
+          Zona de Perigo
+        </h3>
+        
+        {!showDeleteConfirm ? (
+          <div className="bg-red-50 dark:bg-red-900/10 rounded-xl p-4 border border-red-100 dark:border-red-900/20">
+            <p className="text-sm text-red-800 dark:text-red-200 mb-4">
+              Ao excluir sua conta, todos os seus dados, histórico e configurações serão apagados permanentemente. Esta ação não pode ser desfeita.
+            </p>
             <button
-              onClick={handleDeleteAccount}
-              disabled={isDeleting}
-              className="inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex justify-center items-center px-4 py-2 border border-red-200 dark:border-red-800 shadow-sm text-sm font-medium rounded-md text-red-600 dark:text-red-400 bg-white dark:bg-black hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
             >
-              {isDeleting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
-              Tenho certeza, excluir tudo
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              disabled={isDeleting}
-              className="inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Cancelar
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir minha conta
             </button>
           </div>
+        ) : (
+          <div className="bg-red-50 dark:bg-red-900/10 rounded-xl p-4 border border-red-200 dark:border-red-800 animate-in fade-in slide-in-from-bottom-2">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+              Para confirmar, digite seu e-mail ({user?.email}):
+            </p>
+            <input
+              type="email"
+              value={deleteEmail}
+              onChange={(e) => setDeleteEmail(e.target.value)}
+              className="w-full rounded-md border border-red-300 dark:border-red-700 px-3 py-2 bg-white dark:bg-slate-900 text-foreground mb-4 focus:outline-none focus:ring-1 focus:ring-red-500"
+              placeholder={user?.email || ''}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || deleteEmail !== user?.email}
+                className="inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+                Excluir permanentemente
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteEmail('');
+                }}
+                disabled={isDeleting}
+                className="inline-flex justify-center items-center px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         )}
-        </div>
       </div>
     </div>
   );

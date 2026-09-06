@@ -4,6 +4,9 @@ import type { Transaction } from '../../types/chat';
 import { Check, Edit2, Trash2, X, Tag, Calendar, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTelemetry } from '../../hooks/useTelemetry';
+import { formatDate } from '../../lib/date';
+import { formatCurrency } from '../../lib/currency';
+import { getCategoryName } from '../../lib/categories';
 
 interface TransactionCardProps {
   transaction: Transaction;
@@ -19,21 +22,12 @@ const CATEGORIES = [
 export const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, onUpdate, onDelete }) => {
   const [isEditingValue, setIsEditingValue] = useState(false);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   
   const [editValue, setEditValue] = useState(String(transaction.valor));
   const [editCategory, setEditCategory] = useState(transaction.categoria);
 
   const { trackEvent } = useTelemetry();
-
-  const formatCurrency = (val: number | null) => {
-    if (val === null) return 'R$ 0,00';
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
 
   const handleUpdateField = async (field: 'valor' | 'categoria', newValue: any) => {
     try {
@@ -90,14 +84,38 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, o
         <h4 className="font-semibold text-foreground capitalize">
           {transaction.descricao || 'Despesa registrada'}
         </h4>
-        <button 
-          onClick={handleDelete}
-          className="text-muted-foreground hover:text-estouro transition-colors p-1"
-          title="Desfazer"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {!isConfirmingDelete ? (
+          <button 
+            onClick={() => setIsConfirmingDelete(true)}
+            className="text-muted-foreground hover:text-estouro transition-colors p-1"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        ) : null}
       </div>
+
+      {isConfirmingDelete && (
+        <div className="bg-estouro/10 rounded-lg p-3 mb-3 border border-estouro/20">
+          <p className="text-sm text-foreground mb-2">
+            Excluir {transaction.descricao || 'esta transação'} de {formatCurrency(transaction.valor)}?
+          </p>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleDelete}
+              className="text-xs bg-estouro text-primary-foreground px-3 py-1.5 rounded font-medium hover:bg-estouro/90 transition-colors"
+            >
+              Sim, excluir
+            </button>
+            <button 
+              onClick={() => setIsConfirmingDelete(false)}
+              className="text-xs bg-muted text-foreground px-3 py-1.5 rounded font-medium hover:bg-border transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {/* Value Chip */}
@@ -133,24 +151,27 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, o
         <div className="flex items-start gap-2">
           <Tag className="w-4 h-4 text-muted-foreground mt-1" />
           {isEditingCategory ? (
-            <div className="flex flex-wrap gap-1">
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => handleSaveCategory(cat)}
-                  className={`px-2 py-1 text-xs rounded-full border-2 ${editCategory === cat ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-border hover:border-primary'}`}
-                >
-                  {cat}
-                </button>
-              ))}
-              <button onClick={() => setIsEditingCategory(false)} className="px-2 py-1 text-xs text-estouro">Cancelar</button>
+            <div className="flex items-center gap-1">
+              <select
+                autoFocus
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value as any)}
+                className="w-32 px-2 py-1 text-sm border-2 rounded bg-muted border-border text-foreground focus:outline-none focus:border-primary capitalize"
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveCategory(editCategory)}
+              >
+                {CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{getCategoryName(cat)}</option>
+                ))}
+              </select>
+              <button onClick={() => handleSaveCategory(editCategory)} className="p-1 text-receita"><Check className="w-4 h-4"/></button>
+              <button onClick={() => { setIsEditingCategory(false); setEditCategory(transaction.categoria); }} className="p-1 text-estouro"><X className="w-4 h-4"/></button>
             </div>
           ) : (
             <button 
               onClick={() => setIsEditingCategory(true)}
               className="px-3 py-1 rounded-full bg-muted text-sm text-foreground hover:bg-border transition-colors flex items-center gap-1 capitalize"
             >
-              {transaction.categoria}
+              {getCategoryName(transaction.categoria)}
               <Edit2 className="w-3 h-3 opacity-50" />
             </button>
           )}
@@ -159,7 +180,9 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({ transaction, o
         {/* Date Chip */}
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{formatDate(transaction.data)}</span>
+          {transaction.data && (
+            <span className="text-sm text-muted-foreground">{formatDate(transaction.data, 'dd/MM/yyyy')}</span>
+          )}
         </div>
       </div>
     </div>

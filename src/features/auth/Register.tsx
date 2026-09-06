@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Wallet, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const registerSchema = z.object({
   fullName: z.string().min(2, 'O nome deve ter no mínimo 2 caracteres'),
@@ -22,6 +23,13 @@ export const Register: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
+  const { session } = useAuth();
+
+  React.useEffect(() => {
+    if (session) {
+      navigate('/app');
+    }
+  }, [session, navigate]);
 
   const onSubmit = async (data: RegisterForm) => {
     setIsSubmitting(true);

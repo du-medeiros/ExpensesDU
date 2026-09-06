@@ -1,10 +1,15 @@
 import React from 'react';
+import { Edit2, Trash2 } from 'lucide-react';
+import { formatCurrency } from '../../lib/currency';
+import { getCategoryName } from '../../lib/categories';
 
 interface MetaCardProps {
+  id: string;
   categoria: string;
   valorTeto: number;
   gastoAtual: number;
-  tipo?: 'despesa' | 'receita';
+  onEdit?: (id: string, categoria: string, valorTeto: number) => void;
+  onDelete?: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -18,36 +23,23 @@ const CATEGORY_COLORS: Record<string, string> = {
   outros: '#64748b'
 };
 
-export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoAtual, tipo = 'despesa' }) => {
+export const MetaCard: React.FC<MetaCardProps> = ({ id, categoria, valorTeto, gastoAtual, onEdit, onDelete }) => {
   const percentage = Math.min((gastoAtual / valorTeto) * 100, 100);
   const isOver = gastoAtual > valorTeto;
-  const isReceita = tipo === 'receita';
 
-  let statusText = isReceita ? 'Em andamento' : 'Dentro do limite';
+  let statusText = 'Dentro do limite';
   let statusColorClass = 'text-muted-foreground bg-muted';
-  let barColorClass = isReceita ? 'bg-receita' : 'bg-primary';
+  let barColorClass = 'bg-primary';
 
-  if (isReceita) {
-    if (percentage >= 100) {
-      statusText = 'Meta alcançada!';
-      statusColorClass = 'text-receita bg-receita/10';
-    } else if (percentage >= 50) {
-      statusText = 'Mais da metade';
-    }
-  } else {
-    if (isOver) {
-      statusText = 'Estourou o teto';
-      statusColorClass = 'text-estouro bg-estouro/10';
-      barColorClass = 'bg-estouro';
-    } else if (percentage >= 70) {
-      statusText = 'Atenção, quase lá';
-      statusColorClass = 'text-atencao bg-atencao/10';
-      barColorClass = 'bg-atencao';
-    }
+  if (isOver) {
+    statusText = 'Estourou o teto';
+    statusColorClass = 'text-estouro bg-estouro/10';
+    barColorClass = 'bg-estouro';
+  } else if (percentage >= 70) {
+    statusText = 'Atenção, quase lá';
+    statusColorClass = 'text-atencao bg-atencao/10';
+    barColorClass = 'bg-atencao';
   }
-
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   return (
     <div className="bg-background rounded-2xl p-5 shadow-sm border-2 border-border mb-4">
@@ -60,15 +52,27 @@ export const MetaCard: React.FC<MetaCardProps> = ({ categoria, valorTeto, gastoA
             {categoria.substring(0, 1).toUpperCase()}
           </div>
           <div>
-            <h3 className="font-semibold text-foreground capitalize">
-              {categoria} {isReceita && <span className="text-xs font-normal text-muted-foreground ml-1">(Poupança)</span>}
+            <h3 className="font-semibold text-foreground">
+              {getCategoryName(categoria)}
             </h3>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${statusColorClass}`}>
               {statusText}
             </span>
           </div>
         </div>
-        <div className="text-right">
+        <div className="flex flex-col items-end">
+          <div className="flex gap-2 mb-1">
+            {onEdit && (
+              <button onClick={() => onEdit(id, categoria, valorTeto)} className="p-1 text-muted-foreground hover:text-primary transition-colors">
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={() => onDelete(id)} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           <p className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(gastoAtual)}</p>
           <p className="text-xs text-muted-foreground tabular-nums">de {formatCurrency(valorTeto)}</p>
         </div>

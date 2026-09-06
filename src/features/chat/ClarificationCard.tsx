@@ -1,4 +1,6 @@
 import React from 'react';
+import { HelpCircle } from 'lucide-react';
+import { getCategoryName } from '../../lib/categories';
 
 interface ClarificationCardProps {
   question: string;
@@ -11,36 +13,29 @@ const CATEGORIES = [
 ];
 
 export const ClarificationCard: React.FC<ClarificationCardProps> = ({ question, onSelect }) => {
-  // Try to determine what kind of clarification it is.
-  // The simplest is category clarification.
-  // If the question contains 'categoria', 'qual', etc, we show category chips.
-  const isCategoryClarification = question.toLowerCase().includes('categoria') || question.toLowerCase().includes('com o que');
-
   return (
     <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 mt-2 max-w-sm w-full">
-      <p className="text-orange-800 dark:text-orange-200 text-sm mb-4">
+      <p className="text-sm font-medium text-orange-900 dark:text-orange-100 mb-3 flex items-center gap-2">
+        <HelpCircle className="w-4 h-4" />
         {question}
       </p>
-
-      {isCategoryClarification ? (
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => onSelect(cat)}
-              className="px-3 py-1.5 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-colors capitalize"
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="flex gap-2">
-           {/* Fallback to simple Yes/No or just let the user know they need to type in the main input if we can't show chips */}
-           <button onClick={() => onSelect('Sim')} className="px-4 py-2 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted">Sim</button>
-           <button onClick={() => onSelect('Não')} className="px-4 py-2 bg-background border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted">Não</button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => onSelect(cat)}
+            className="px-3 py-1.5 bg-background border-2 border-border text-foreground rounded-full text-sm font-medium hover:border-primary hover:text-primary transition-colors"
+          >
+            {getCategoryName(cat)}
+          </button>
+        ))}
+        <button
+          onClick={() => onSelect('Cancelar')}
+          className="px-3 py-1.5 bg-background border-2 border-transparent text-red-600 dark:text-red-400 rounded-full text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 };

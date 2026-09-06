@@ -174,15 +174,20 @@ REGRAS OBRIGATÓRIAS:
 - Taxonomia permitida para categorias: alimentacao, transporte, moradia, saude, lazer, compras, contas, outros. Qualquer coisa fora disso DEVE ser "outros".
 - Tipos de transação ou metas: "despesa" (padrão) ou "receita".
 - Se o usuário mencionar algo como "ganhei 500 de salário" ou "recebi", registre como TIPO="receita" e CATEGORIA="outros".
-- Se o usuário falar sobre "guardar", "juntar", "investir", "poupar", "meta", ou "teto" referindo-se a um objetivo/limite, defina intencao="meta". Limites de gasto = "despesa", economias = "receita".
-- PARA A INTENÇÃO "meta", OS DADOS DA META (valor, categoria, tipo) DEVEM OBRIGATORIAMENTE SER PREENCHIDOS DENTRO DO ARRAY 'transacoes'.
+- Se o usuário falar sobre "meta", "teto", "limite" ou "objetivo" referindo-se a um limite de gastos, defina intencao="meta".
+- PARA A INTENÇÃO "meta", OS DADOS DA META (valor, categoria) DEVEM OBRIGATORIAMENTE SER PREENCHIDOS DENTRO DO ARRAY 'transacoes'. O 'tipo' de metas é irrelevante, pois metas são sempre tetos de gastos.
 - Se o usuário apenas perguntar sobre seu saldo ou metas, defina intencao="conversa" e use o CONTEXTO DO USUÁRIO para responder informativamente.
 - Múltiplos valores na frase (ex: "mercado 120 e farmácia 40") = gerar MÚLTIPLAS transações separadas na saída.
 - Data: A data atual do cliente é ${dataCliente} (Timezone: ${timezone}).
 - Datas relativas (ontem, segunda passada) DEVEM ser resolvidas baseadas nesta data atual. Formato YYYY-MM-DD.
 - Valores monetários: Converta qualquer formato para número float. 
-- Sem valor identificável: NUNCA assuma. Retorne valor = null e gere um texto de 'pergunta'.
-- Confiança (0.0 a 1.0): Seja rigoroso. Se a descrição não estiver clara, defina confianca 0.5 e pergunte. Se faltar o valor, confianca deve ser 0.0, valor nulo, e incluir pergunta. 
+- O valor deve vir EXCLUSIVAMENTE da mensagem atual.
+- Se a mensagem atual não contém valor identificável, devolver valor: null.
+- É PROIBIDO inferir, estimar ou reaproveitar valor do histórico. O histórico serve APENAS para resolver intenção "corrigir".
+- Confiança (0.0 a 1.0): Seja rigoroso. Se a descrição não estiver clara, defina confianca 0.5 e pergunte. Se faltar o valor, confianca deve ser 0.0, valor nulo, e incluir pergunta específica (ex: "Qual o valor do almoço?"). 
+- NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).
+- DESCRIÇÃO: Extraia apenas o NOME CURTO do item. Ex: "gastei 30 no uber" -> "Uber". Nunca repita a frase inteira. Nunca aplique capitalização palavra por palavra.
+
 
 GUIA DE CATEGORIAS:
 - "alimentacao": almoço, janta, lanche, padaria, supermercado, mercado, pizza, ifood.
@@ -197,7 +202,7 @@ GUIA DE CATEGORIAS:
 Intenções possíveis:
   1. "registrar" -> APENAS para registro de gastos ou ganhos reais que já ocorreram no dia a dia.
   2. "consultar" -> ex: "quanto gastei?", "maior gasto". (Neste caso transacoes=[]).
-  3. "meta" -> ex: "quero juntar 400", "limite de 400 em comida", "quero gastar no máximo 400", "quero poupar 1000". (Use meta SEMPRE que o usuário expressar um desejo de alcançar, poupar ou limitar um valor).
+  3. "meta" -> ex: "limite de 400 em comida", "quero gastar no máximo 400". (Use meta SEMPRE que o usuário expressar um desejo de limitar um gasto).
   4. "corrigir" -> ex: "na verdade foi 40", referindo a gasto anterior.
   5. "conversa" -> ex: "oi", "obrigado", "quais são minhas metas". (Neste caso transacoes=[], resposta pode conter algo amigável e usar o CONTEXTO DO USUÁRIO).
 
@@ -256,9 +261,13 @@ Retorne ESTRITAMENTE o JSON conforme o schema.`;
     }
 
     let savedTransactionIds: string[] = [];
-    let assistantMessageContent = jsonContent.resposta || 'Processado.';
+    let assistantMessageContent = '';
+    let successfullySavedTransacoes: any[] = [];
+    let failedTransacoes: string[] = [];
 
-    if (jsonContent.intencao === 'consultar') {
+    if (jsonContent.intencao === 'conversa') {
+      assistantMessageContent = jsonContent.resposta || 'Olá! Como posso ajudar?';
+    } else if (jsonContent.intencao === 'consultar') {
       // 2-PASS: Search the database using the new RPC and inject into a second LLM prompt
       const targetDate = dataCliente;
       const { data: summaryData, error: summaryError } = await supabase
@@ -276,7 +285,7 @@ REGRA ABSOLUTA:
 - Baseie-se ESTRITAMENTE nesses números para responder à pergunta do usuário.
 - NUNCA faça cálculos próprios, estimativas ou preencha lacunas (não calcule subtrações ou proporções que não estejam prontas). 
 - Se a pergunta for sobre um escopo que não está respondido nesses dados (ex: gasto do ano, gasto de terça-feira), responda honestamente que ainda não sabe responder.
-- Apenas redija a frase de resposta para o usuário de forma amigável e direta. Nada de markdown complexo, no máximo negrito.`;
+- Apenas redija a frase de resposta para o usuário de forma amigável e direta. NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).`;
 
         const consultResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -309,18 +318,14 @@ REGRA ABSOLUTA:
             user_id: user.id,
             categoria: t.categoria,
             mes_referencia: firstDayOfMonth,
-            valor_teto: t.valor,
-            tipo: t.tipo
+            valor_teto: t.valor
           }, { onConflict: 'user_id, categoria, mes_referencia' });
 
         if (!goalError) {
-          if (t.tipo === 'receita') {
-            assistantMessageContent = `Meta de poupança de R$ ${t.valor.toFixed(2)} (${t.categoria}) criada para este mês!`;
-          } else {
-            assistantMessageContent = `Teto de R$ ${t.valor.toFixed(2)} para ${t.categoria} criado para este mês!`;
-          }
+          const formattedVal = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(t.valor);
+          assistantMessageContent = `Teto de ${formattedVal} para ${t.categoria} criado para este mês!`;
           jsonContent.resposta = assistantMessageContent;
-          trackEvent('meta_criada', { categoria: t.categoria, valor: t.valor, tipo: t.tipo });
+          trackEvent('meta_criada', { categoria: t.categoria, valor: t.valor });
         } else {
           assistantMessageContent = `Tive um problema ao salvar sua meta.`;
         }
@@ -328,14 +333,16 @@ REGRA ABSOLUTA:
         assistantMessageContent = jsonContent.pergunta || 'Qual o valor e a categoria para esta meta?';
       }
     } else if (jsonContent.intencao === 'registrar' && jsonContent.transacoes.length > 0) {
+      const missingValues = jsonContent.transacoes.some(t => t.valor === null);
       const allConfident = jsonContent.transacoes.every(t => t.confianca >= 0.8 && t.valor !== null);
       
-      if (allConfident) {
+      if (missingValues || !allConfident) {
+        assistantMessageContent = jsonContent.pergunta || 'Pode esclarecer melhor esse gasto? Faltam detalhes.';
+        trackEvent('esclarecimento_solicitado', { transacoes: jsonContent.transacoes });
+      } else {
         for (let i = 0; i < jsonContent.transacoes.length; i++) {
           const t = jsonContent.transacoes[i];
-          const uniqueClientMessageId = jsonContent.transacoes.length > 1 
-            ? `${client_message_id}-${i}` 
-            : client_message_id;
+          const uniqueClientMessageId = crypto.randomUUID();
 
           const { data: txData, error: txError } = await supabase
             .from('transactions')
@@ -355,8 +362,10 @@ REGRA ABSOLUTA:
 
           if (txError) {
             console.error('Error saving transaction:', txError);
+            failedTransacoes.push(t.descricao);
           } else if (txData) {
             savedTransactionIds.push(txData.id);
+            successfullySavedTransacoes.push(t);
             trackEvent('transacao_criada', { confianca: t.confianca, origem: 'chat' });
             
             if (historico && historico.length > 0) {
@@ -367,12 +376,27 @@ REGRA ABSOLUTA:
             }
           }
         }
-      } else {
-        assistantMessageContent = jsonContent.pergunta || 'Pode esclarecer melhor esse gasto? Falta valor ou categoria.';
-        trackEvent('esclarecimento_solicitado', { transacoes: jsonContent.transacoes });
+        
+        const formatMoeda = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+        if (successfullySavedTransacoes.length === 1) {
+          const t = successfullySavedTransacoes[0];
+          assistantMessageContent = `Anotei: ${t.categoria}, ${formatMoeda(t.valor)}`;
+        } else if (successfullySavedTransacoes.length > 1) {
+          const details = successfullySavedTransacoes.map(t => `${t.descricao} ${formatMoeda(t.valor)}`).join(' e ');
+          assistantMessageContent = `Anotei ${successfullySavedTransacoes.length} lançamentos: ${details}`;
+        }
+        
+        if (failedTransacoes.length > 0) {
+          assistantMessageContent += successfullySavedTransacoes.length > 0 
+            ? `\nPorém, não consegui salvar: ${failedTransacoes.join(', ')}.`
+            : `Não consegui salvar os lançamentos: ${failedTransacoes.join(', ')}.`;
+        }
       }
-    } else if (jsonContent.pergunta) {
+    } else if (jsonContent.pergunta && jsonContent.intencao !== 'conversa') {
       assistantMessageContent = jsonContent.pergunta;
+    } else if (!assistantMessageContent) {
+      assistantMessageContent = jsonContent.resposta || 'Não entendi bem o que quis dizer.';
     }
 
     // --- Agente Financeiro ---
@@ -398,7 +422,8 @@ Redija uma dica muito curta em linguagem amigável informando os números apurad
 REGRAS OBRIGATÓRIAS:
 - NÃO INVENTE DADOS.
 - ZERO JUÍZO DE VALOR. Não dê sermão, não diga que gastou demais, não dê parabéns, não dê conselho de investimento. Seja puramente informativo, objetivo e gentil.
-- Inicie a frase obrigatoriamente com o emoji 💡.`;
+- Inicie a frase obrigatoriamente com o emoji 💡.
+- NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).`;
 
         const tipResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -421,24 +446,51 @@ REGRAS OBRIGATÓRIAS:
     }
     // --- Fim Agente Financeiro ---
 
-    const { data: msgData, error: msgError } = await supabase
+    let assistantMessageIds: string[] = [];
+    
+    // First message (with text content)
+    const { data: firstMsgData, error: firstMsgError } = await supabase
       .from('chat_messages')
       .insert({
         user_id: user.id,
         papel: 'assistant',
         conteudo: assistantMessageContent,
-        transaction_id: savedTransactionIds.length === 1 ? savedTransactionIds[0] : null,
+        transaction_id: savedTransactionIds.length > 0 ? savedTransactionIds[0] : null,
       })
       .select('id, created_at, papel, conteudo')
       .single();
       
-    if (msgError) {
-       console.error('Error inserting assistant message:', msgError);
+    if (firstMsgError) {
+       console.error('Error inserting first assistant message:', firstMsgError);
+    } else if (firstMsgData) {
+       assistantMessageIds.push(firstMsgData.id);
+    }
+
+    // Subsequent ghost messages (empty text) to hold extra cards
+    if (savedTransactionIds.length > 1) {
+      for (let i = 1; i < savedTransactionIds.length; i++) {
+        const { data: extraMsgData, error: extraMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            user_id: user.id,
+            papel: 'assistant',
+            conteudo: ' ', // Empty space to be hidden by frontend
+            transaction_id: savedTransactionIds[i],
+          })
+          .select('id')
+          .single();
+          
+        if (extraMsgError) {
+          console.error('Error inserting extra assistant message:', extraMsgError);
+        } else if (extraMsgData) {
+          assistantMessageIds.push(extraMsgData.id);
+        }
+      }
     }
 
     return new Response(JSON.stringify({
       ...jsonContent,
-      assistant_message_id: msgData?.id,
+      assistant_message_ids: assistantMessageIds,
       saved_transaction_ids: savedTransactionIds
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
