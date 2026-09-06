@@ -423,6 +423,7 @@ REGRA ABSOLUTA:
           } else if (txData) {
             localRecentTxs.push({ valor: t.valor, categoria: t.categoria, data: t.data, descricao: t.descricao });
             savedTransactionIds.push(txData.id);
+            t.id = txData.id;
             successfullySavedTransacoes.push(t);
             trackEvent('transacao_criada', { confianca: t.confianca, origem: 'chat' });
             
