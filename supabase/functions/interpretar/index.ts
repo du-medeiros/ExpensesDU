@@ -199,7 +199,7 @@ ${agentContext}
 ${historicoFormatado}
 
 [MENSAGEM ATUAL A SER PROCESSADA - SÓ EXTRAIA DADOS DAQUI]
-A mensagem principal a ser avaliada estará delimitada abaixo.`;
+A mensagem principal a ser avaliada estará delimitada abaixo.
 
 REGRAS OBRIGATÓRIAS:
 - Taxonomia permitida para categorias: alimentacao, transporte, moradia, saude, lazer, compras, contas, outros. Qualquer coisa fora disso DEVE ser "outros".
