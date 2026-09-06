@@ -16,22 +16,24 @@ export const api = {
     const { data, error } = await supabase.rpc('get_monthly_summary', { p_date: dateStr });
     if (error) throw error;
     
+    const rawData = data as any;
+    
     // Converte todos os campos numeric (string do pg) para number
     const parsedData = {
-      ...data,
-      total_mes: parseNumeric(data.total_mes),
-      total_receitas: parseNumeric(data.total_receitas),
-      saldo: parseNumeric(data.saldo),
-      total_mes_anterior: parseNumeric(data.total_mes_anterior),
-      maior_gasto: data.maior_gasto && Object.keys(data.maior_gasto).length > 0 ? {
-        ...data.maior_gasto,
-        valor: parseNumeric(data.maior_gasto.valor)
+      ...rawData,
+      total_mes: parseNumeric(rawData?.total_mes),
+      total_receitas: parseNumeric(rawData?.total_receitas),
+      saldo: parseNumeric(rawData?.saldo),
+      total_mes_anterior: parseNumeric(rawData?.total_mes_anterior),
+      maior_gasto: rawData?.maior_gasto && Object.keys(rawData.maior_gasto).length > 0 ? {
+        ...rawData.maior_gasto,
+        valor: parseNumeric(rawData.maior_gasto.valor)
       } : null,
-      por_categoria: (data.por_categoria || []).map((c: any) => ({
+      por_categoria: (rawData?.por_categoria || []).map((c: any) => ({
         ...c,
         total: parseNumeric(c.total)
       })),
-      top_5_gastos: (data.top_5_gastos || []).map((t: any) => ({
+      top_5_gastos: (rawData?.top_5_gastos || []).map((t: any) => ({
         ...t,
         valor: parseNumeric(t.valor)
       }))
@@ -61,7 +63,8 @@ export const api = {
     const { data, error } = await supabase.rpc('get_or_create_monthly_goals', { p_date: dateStr });
     if (error) throw error;
 
-    return (data || []).map((g: any) => ({
+    const rawData = data as any[];
+    return (rawData || []).map((g: any) => ({
       ...g,
       valor_teto: parseNumeric(g.valor_teto),
       gasto_atual: parseNumeric(g.gasto_atual)
