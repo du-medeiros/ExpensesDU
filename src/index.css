@@ -1,43 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #0284c7; /* sky-600 */
-  --color-primary-foreground: #ffffff;
-  --color-despesa: #f97316; /* orange-500 */
-  --color-receita: #0d9488; /* teal-600 */
-  --color-atencao: #f59e0b; /* amber-500 */
-  --color-estouro: #ea580c; /* orange-600 */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-despesa: var(--despesa);
+  --color-receita: var(--receita);
+  --color-atencao: var(--atencao);
+  --color-estouro: var(--estouro);
 
-  --color-background: #ffffff;
-  --color-foreground: #1f2937; /* gray-800 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 
-  --color-muted: #f1f5f9; /* slate-100 */
-  --color-muted-foreground: #64748b; /* slate-500 */
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
 
-  --color-border: #e2e8f0; /* slate-200 */
-}
-
-@custom-variant dark (&:where(.dark, .dark *));
-
-@theme dark {
-  --color-primary: #38bdf8; /* sky-400 */
-  --color-primary-foreground: #000000;
-  --color-despesa: #fdba74; /* orange-300 */
-  --color-receita: #5eead4; /* teal-300 */
-  
-  --color-background: #000000;
-  --color-foreground: #f8fafc; /* slate-50 */
-
-  --color-muted: #1e293b; /* slate-800 */
-  --color-muted-foreground: #94a3b8; /* slate-400 */
-
-  --color-border: #334155; /* slate-700 */
+  --color-border: var(--border);
 }
 
 :root {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  color-scheme: light dark;
+  --primary: #0284c7; /* sky-600 */
+  --primary-foreground: #ffffff;
+  --despesa: #f97316; /* orange-500 */
+  --receita: #0d9488; /* teal-600 */
+  --atencao: #f59e0b; /* amber-500 */
+  --estouro: #ea580c; /* orange-600 */
+
+  --background: #ffffff;
+  --foreground: #1f2937; /* gray-800 */
+
+  --muted: #f1f5f9; /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+
+  --border: #e2e8f0; /* slate-200 */
+  
+  background-color: var(--background);
+  color: var(--foreground);
+  color-scheme: light;
+}
+
+.dark {
+  --primary: #38bdf8; /* sky-400 */
+  --primary-foreground: #0f172a; /* dark text on light primary */
+  --despesa: #fdba74; /* orange-300 */
+  --receita: #5eead4; /* teal-300 */
+  --atencao: #fcd34d; /* amber-300 */
+  --estouro: #fb923c; /* orange-400 */
+  
+  --background: #0f172a; /* slate-900 (softer than black) */
+  --foreground: #f8fafc; /* slate-50 */
+
+  --muted: #1e293b; /* slate-800 */
+  --muted-foreground: #94a3b8; /* slate-400 */
+
+  --border: #334155; /* slate-700 */
+  
+  color-scheme: dark;
 }
 
 body {
@@ -46,6 +63,8 @@ body {
   min-height: 100dvh;
   font-family: system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* Global utility for tabular-nums */
@@ -55,7 +74,7 @@ body {
 
 /* Accessibility: Global focus ring & touch target floors */
 *:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
