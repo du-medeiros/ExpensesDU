@@ -26,6 +26,7 @@ export const Perfil: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -87,6 +88,14 @@ export const Perfil: React.FC = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  const toggleTheme = () => {
+    const root = document.documentElement;
+    root.classList.toggle('dark');
+    const isNowDark = root.classList.contains('dark');
+    setIsDark(isNowDark);
+    localStorage.setItem('theme', isNowDark ? 'dark' : 'light');
   };
 
   const handleDeleteAccount = async () => {
@@ -190,7 +199,15 @@ export const Perfil: React.FC = () => {
         </form>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 pt-4">
+      <div className="flex flex-col gap-4 mt-8 pb-8">
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-center gap-2 p-3 rounded-xl bg-background border border-border text-foreground hover:bg-muted font-medium transition-colors"
+        >
+          {isDark ? 'Tema Claro' : 'Tema Escuro'}
+        </button>
+
+        <div className="flex justify-between gap-4">
         <button
           onClick={handleLogout}
           className="inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
