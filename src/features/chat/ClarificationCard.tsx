@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { getCategoryName } from '../../lib/categories';
 
 interface ClarificationCardProps {
-  campo_faltante?: 'valor' | 'categoria';
+  campo_faltante?: 'valor' | 'categoria' | 'confirmacao';
   options?: string[];
   onSelect: (answer: string) => void;
 }
 
-export const ClarificationCard: React.FC<ClarificationCardProps> = ({ campo_faltante = 'categoria', options, onSelect }) => {
+export const ClarificationCard: React.FC<ClarificationCardProps> = ({ campo_faltante = 'valor', options, onSelect }) => {
   const [valorInput, setValorInput] = useState('');
 
   const handleConfirmarValor = () => {
@@ -46,15 +45,9 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ campo_falt
               onClick={() => onSelect(opt)}
               className="px-3 py-1.5 bg-background border-2 border-border text-foreground rounded-full text-sm font-medium hover:border-primary hover:text-primary transition-colors"
             >
-              {getCategoryName(opt)}
+              {opt}
             </button>
           ))}
-          <button
-            onClick={() => onSelect('Cancelar')}
-            className="px-3 py-1.5 bg-background border-2 border-transparent text-red-600 dark:text-red-400 rounded-full text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            Cancelar
-          </button>
         </div>
       )}
     </div>

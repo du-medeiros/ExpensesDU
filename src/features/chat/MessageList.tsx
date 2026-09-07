@@ -68,9 +68,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     // Só desce a tela se for uma mensagem nova sendo adicionada (ou inicial)
     // Se paginou para trás, não empurra pra baixo
     if (messages.length > prevMessagesLength.current && messages[messages.length - 1]?.papel === 'user') {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } else if (prevMessagesLength.current === 0 && messages.length > 0) {
-       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 150);
     }
     prevMessagesLength.current = messages.length;
   }, [messages, isTyping]);

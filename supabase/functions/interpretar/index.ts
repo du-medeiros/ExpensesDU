@@ -28,16 +28,17 @@ const TransacaoSchema = z.object({
   data: z.string(),
   descricao: z.string(),
   confianca: z.number().min(0).max(1),
+  ignorar_duplicidade: z.boolean().optional(),
 });
 
 const SaidaSchema = z.object({
   intencao: IntencaoEnum,
   transacoes: z.array(TransacaoSchema),
-  pergunta: z.object({ id: z.string().optional(), texto: z.string(), campo_faltante: z.enum(['valor', 'categoria']).optional(), opcoes: z.array(z.string()).optional() }).nullable(),
+  pergunta: z.object({ id: z.string().optional(), texto: z.string(), campo_faltante: z.enum(['valor', 'categoria', 'confirmacao']).optional(), opcoes: z.array(z.string()).optional() }).nullable(),
   resposta: z.string().nullable(),
 });
 
-type OutputType = z.infer<typeof SaidaSchema>;
+type OutputType = z.infer<typeof SaidaSchema> & { valor_consulta?: number };
 
 const openAiJsonSchema = {
   type: 'object',
@@ -189,27 +190,47 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .single();
         
-      if (!pendingTx || pendingTxError) {
-         throw new Error('Transação pendente não encontrada ou expirada.');
-      }
-      
-      let t = pendingTx.parsed_data;
-      if (pendingTx.campo_faltante === 'valor') {
-         // handle currency signs or spaces
-         const numericStr = resposta_pendente.valor.replace(/[^0-9,.-]/g, '').replace(',', '.');
-         t.valor = parseFloat(numericStr) || 0;
-      } else if (pendingTx.campo_faltante === 'categoria') {
-         t.categoria = resposta_pendente.valor;
-      }
-      
-      await supabase.from('pending_transactions').delete().eq('id', pendingTx.id);
-      
-      jsonContent = {
-         intencao: 'registrar',
-         transacoes: [t],
-         pergunta: null,
-         resposta: null
-      };
+        if (!pendingTx || pendingTxError) {
+           jsonContent = {
+             intencao: 'conversa',
+             transacoes: [],
+             pergunta: null,
+             resposta: 'Não encontrei o que estávamos discutindo (pode ter expirado). Pode enviar a mensagem completa de novo?'
+           };
+        } else {
+           let t = pendingTx.parsed_data;
+           if (pendingTx.campo_faltante === 'valor') {
+              // handle currency signs or spaces
+              const numericStr = resposta_pendente.valor.replace(/[^0-9,.-]/g, '').replace(',', '.');
+              t.valor = parseFloat(numericStr) || 0;
+           } else if (pendingTx.campo_faltante === 'categoria') {
+              t.categoria = resposta_pendente.valor;
+           } else if (pendingTx.campo_faltante === 'confirmacao') {
+              if (resposta_pendente.valor === 'Sim, lançar') {
+                 t.ignorar_duplicidade = true;
+              } else {
+                 jsonContent = {
+                    intencao: 'conversa',
+                    transacoes: [],
+                    pergunta: null,
+                    resposta: 'Ok, lançamento cancelado.'
+                 };
+                 await supabase.from('pending_transactions').delete().eq('id', pendingTx.id);
+              }
+           }
+           
+           if (!jsonContent) {
+              t.confianca = 1;
+              await supabase.from('pending_transactions').delete().eq('id', pendingTx.id);
+              
+              jsonContent = {
+                 intencao: 'registrar',
+                 transacoes: [t],
+                 pergunta: null,
+                 resposta: null
+              };
+           }
+        }
     } else {
 
     // Insert user message
@@ -269,14 +290,14 @@ REGRAS OBRIGATÓRIAS:
 - Data: A data atual do cliente é ${dataCliente} (Timezone: ${timezone}).
 - Datas relativas (ontem, segunda passada) DEVEM ser resolvidas baseadas nesta data atual. Formato YYYY-MM-DD.
 - Valores monetários: Converta qualquer formato para número float. 
-- Uma mensagem que contém apenas um número ou valor monetário (ex: "32", "50 reais") é intenção "registrar". Defina confianca 0.0, extraia o valor e use "pergunta" para pedir a categoria (ex: "Qual a categoria desse gasto?", campo_faltante="categoria").
+- Uma mensagem que contém apenas um número ou valor monetário (ex: "32", "50 reais") é intenção "registrar". Extraia o valor, use a categoria "outros" e NÃO faça perguntas.
 - O valor deve vir EXCLUSIVAMENTE da mensagem atual.
 - O array transacoes deve conter EXCLUSIVAMENTE transações extraídas da mensagem atual. Transações do histórico já foram registradas e NUNCA devem ser repetidas.
 - Se a mensagem atual não contém valor identificável (e não é apenas um número), devolver valor: null.
 - É PROIBIDO inferir, estimar ou reaproveitar valor do histórico. O histórico serve APENAS para resolver intenção "corrigir".
-- Confiança (0.0 a 1.0): Seja rigoroso. Na intenção registrar, se faltar O VALOR, defina o valor como null e pergunte o valor (campo_faltante="valor"). Se faltar A CATEGORIA, use "outros" e não pergunte nada, a menos que a mensagem seja APENAS UM NÚMERO (ex: "50"), neste caso, pergunte a categoria (campo_faltante="categoria"). Para a mensagem "almoço" ou "padaria", se o valor faltar, identifique a categoria normalmente e pergunte apenas o valor!
+- Confiança (0.0 a 1.0): Seja rigoroso. Na intenção registrar, se faltar O VALOR, defina o valor como null e pergunte o valor (campo_faltante="valor"). Se faltar A CATEGORIA (mesmo que a mensagem seja apenas um número), OBRIGATORIAMENTE use "outros" e registre normalmente. NÃO PERGUNTE A CATEGORIA EM HIPÓTESE ALGUMA. O único campo que pode gerar pergunta é o VALOR ausente.
 - NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).
-- DESCRIÇÃO: Preserve o termo original exato que o usuário usou (ex: "netflix", "açougue", "uber", "teste"). Não substitua o termo pelo nome da categoria. Extraia apenas o NOME CURTO do item. Nunca repita a frase inteira. Nunca aplique capitalização palavra por palavra.
+- DESCRIÇÃO: Preserve o termo que identifica o gasto. Não resuma demais se isso perder o contexto (ex: "teste 12 no lazer" -> "Teste", "almoço no shopping" -> "Almoço no shopping" ou "Almoço", "uber para o aeroporto" -> "Uber aeroporto"). Nunca reduza a uma palavra genérica quando a frase tem um termo melhor. Nunca aplique capitalização palavra por palavra.
 
 
 GUIA DE CATEGORIAS:
@@ -496,9 +517,28 @@ REGRA ABSOLUTA:
             rt.descricao === t.descricao
           );
 
-          if (isDuplicate) {
+          if (isDuplicate && !t.ignorar_duplicidade) {
             trackEvent('transacao_duplicada_rejeitada', { transacao: t });
-            continue;
+            
+            const { data: pendingInsertData } = await supabase
+              .from('pending_transactions')
+              .insert({
+                 user_id: user.id,
+                 parsed_data: t,
+                 campo_faltante: 'confirmacao'
+              })
+              .select('id')
+              .single();
+              
+            jsonContent.pergunta = {
+               id: pendingInsertData?.id,
+               texto: `Você registrou ${t.descricao} R$ ${t.valor?.toLocaleString('pt-BR', {minimumFractionDigits: 2})} há pouco. Quer lançar de novo?`,
+               campo_faltante: 'confirmacao',
+               opcoes: ['Sim, lançar', 'Não, era engano']
+            };
+            
+            assistantMessageContent = jsonContent.pergunta.texto;
+            break;
           }
 
           const uniqueClientMessageId = crypto.randomUUID();
@@ -589,6 +629,7 @@ REGRAS OBRIGATÓRIAS:
 - NÃO INVENTE DADOS.
 - ZERO JUÍZO DE VALOR. Não dê sermão, não diga que gastou demais, não dê parabéns, não dê conselho de investimento. Seja puramente informativo, objetivo e gentil.
 - Inicie a frase obrigatoriamente com o emoji 💡.
+- FORMATE TODOS OS VALORES MONETÁRIOS no padrão brasileiro (ex: R$ 49,50). Não deixe números crus na resposta.
 - NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).`;
 
         const tipResponse = await fetch('https://api.openai.com/v1/chat/completions', {

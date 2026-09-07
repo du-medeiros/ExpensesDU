@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { format } from 'date-fns';
 import type { ChatMessageWithTransaction, Transaction } from '../../types/chat';
 import { MessageList } from './MessageList';
 import { Send, WifiOff } from 'lucide-react';
@@ -153,7 +154,7 @@ export const Chat: React.FC = () => {
           },
           body: JSON.stringify({
             texto: text.trim(),
-            dataCliente: new Date().toISOString().split('T')[0],
+            dataCliente: format(new Date(), 'yyyy-MM-dd'),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             client_message_id: clientMsgId,
             historico: messages.slice(-5).map(m => ({ role: m.papel, content: m.conteudo }))
@@ -236,7 +237,7 @@ export const Chat: React.FC = () => {
     }
   };
 
-  const handleSendClarification = async (pergunta_id: string, _campo_faltante: 'valor' | 'categoria', answer: string) => {
+  const handleSendClarification = async (pergunta_id: string, _campo_faltante: 'valor' | 'categoria' | 'confirmacao', answer: string) => {
     if (!user) return;
     
     const clientMsgId = crypto.randomUUID();

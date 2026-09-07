@@ -6,7 +6,7 @@ import { formatDate } from '../../lib/date';
 import { formatCurrency } from '../../lib/currency';
 import { getCategoryName } from '../../lib/categories';
 import { api, type Transaction } from '../../lib/api';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTelemetry } from '../../hooks/useTelemetry';
@@ -181,7 +181,7 @@ export const Resumo: React.FC = () => {
             {totalDespesas > 0 && (
               <div className="bg-background rounded-2xl p-6 shadow-sm border border-border">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Gastos por Categoria</h3>
-                <div className="h-64 relative">
+                <div className="h-48 relative mb-6">
                   <ResponsiveContainer width="99%" height="100%">
                     <PieChart>
                       <Pie
@@ -190,8 +190,8 @@ export const Resumo: React.FC = () => {
                         nameKey="categoria"
                         cx="50%"
                         cy="50%"
-                        innerRadius={70}
-                        outerRadius={90}
+                        innerRadius={60}
+                        outerRadius={80}
                         stroke="none"
                         paddingAngle={2}
                       >
@@ -204,23 +204,22 @@ export const Resumo: React.FC = () => {
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--color-background)', color: 'var(--color-foreground)' }}
                         itemStyle={{ color: 'var(--color-foreground)' }}
                       />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36} 
-                        iconType="circle"
-                        formatter={(value, entry: any) => {
-                          const catName = getCategoryName(value as any);
-                          const totalCat = entry.payload?.payload?.total || entry.payload?.total || 0;
-                          return <span className="text-foreground">{`${catName} (${formatCurrency(totalCat)})`}</span>;
-                        }}
-                      />
                     </PieChart>
                   </ResponsiveContainer>
                   {/* Center text for Donut */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-xs text-muted-foreground font-medium uppercase">Despesas</span>
                     <span className="text-lg font-bold text-foreground tabular-nums">{formatCurrency(totalDespesas)}</span>
                   </div>
+                </div>
+                {/* Custom Legend outside to allow dynamic height */}
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-2">
+                  {data.por_categoria.map((entry: any) => (
+                    <div key={entry.categoria} className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CATEGORY_COLORS[entry.categoria] || CATEGORY_COLORS['outros'] }} />
+                      <span className="text-xs text-foreground font-medium">{getCategoryName(entry.categoria)} ({formatCurrency(entry.total)})</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
