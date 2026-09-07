@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Edit2, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../../lib/currency';
 import { getCategoryName } from '../../lib/categories';
@@ -9,7 +9,7 @@ interface MetaCardProps {
   valorTeto: number;
   gastoAtual: number;
   onEdit?: (id: string, categoria: string, valorTeto: number) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string, cascade: boolean, categoria: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -24,6 +24,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export const MetaCard: React.FC<MetaCardProps> = ({ id, categoria, valorTeto, gastoAtual, onEdit, onDelete }) => {
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  
   const percentage = Math.min((gastoAtual / valorTeto) * 100, 100);
   const isOver = gastoAtual > valorTeto;
 
@@ -67,8 +69,8 @@ export const MetaCard: React.FC<MetaCardProps> = ({ id, categoria, valorTeto, ga
                 <Edit2 className="w-4 h-4" />
               </button>
             )}
-            {onDelete && (
-              <button onClick={() => onDelete(id)} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+            {onDelete && !isConfirmingDelete && (
+              <button onClick={() => setIsConfirmingDelete(true)} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
@@ -78,6 +80,34 @@ export const MetaCard: React.FC<MetaCardProps> = ({ id, categoria, valorTeto, ga
         </div>
       </div>
       
+      {isConfirmingDelete && onDelete && (
+        <div className="bg-estouro/10 rounded-lg p-3 mb-4 border border-estouro/20">
+          <p className="text-sm text-foreground mb-3 font-medium">
+            Excluir o teto de {formatCurrency(valorTeto)} para {getCategoryName(categoria)}?
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <button 
+              onClick={() => onDelete(id, false, categoria)}
+              className="text-xs bg-estouro text-primary-foreground px-3 py-2 rounded font-medium hover:bg-estouro/90 transition-colors flex-1"
+            >
+              Só este mês
+            </button>
+            <button 
+              onClick={() => onDelete(id, true, categoria)}
+              className="text-xs bg-estouro/80 text-primary-foreground px-3 py-2 rounded font-medium hover:bg-estouro transition-colors flex-1"
+            >
+              Este e os próximos
+            </button>
+            <button 
+              onClick={() => setIsConfirmingDelete(false)}
+              className="text-xs bg-muted text-foreground px-3 py-2 rounded font-medium hover:bg-border transition-colors flex-1 sm:flex-none"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
         <div 
           className={`h-full rounded-full transition-all duration-500 ${barColorClass}`} 

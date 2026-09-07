@@ -58,7 +58,7 @@ export const Metas: React.FC = () => {
           user_id: user.id,
           categoria: categoria as any,
           mes_referencia: firstDayOfMonth,
-          valor_limite: valor_teto,
+          valor_teto: valor_teto,
         }, { onConflict: 'user_id, categoria, mes_referencia' });
 
       if (error) throw error;
@@ -67,14 +67,26 @@ export const Metas: React.FC = () => {
     } catch (err) {
       console.error('Error saving goal', err);
       toast.error('Erro ao salvar meta');
+      throw err;
     }
   };
 
-  const handleDeleteGoal = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este teto de gastos?')) return;
+  const handleDeleteGoal = async (id: string, cascade: boolean, categoria: string) => {
+    if (!user) return;
     try {
-      const { error } = await supabase.from('goals').delete().eq('id', id);
-      if (error) throw error;
+      if (cascade) {
+        const firstDayOfMonth = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), 'yyyy-MM-dd');
+        const { error } = await supabase
+          .from('goals')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('categoria', categoria as any)
+          .gte('mes_referencia', firstDayOfMonth);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('goals').delete().eq('id', id);
+        if (error) throw error;
+      }
       toast.success('Teto excluído com sucesso');
       await loadGoals();
     } catch (err) {

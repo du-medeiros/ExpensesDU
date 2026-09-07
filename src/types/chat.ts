@@ -5,5 +5,5 @@ export type ChatMessage = Database['public']['Tables']['chat_messages']['Row'];
 
 export interface ChatMessageWithTransaction extends ChatMessage {
   transaction?: Transaction | null;
-  pergunta?: { texto: string; opcoes: string[] } | null;
+  pergunta?: { id?: string; texto: string; campo_faltante?: 'valor' | 'categoria'; opcoes?: string[] } | null;
 }

@@ -8,7 +8,7 @@ interface MessageListProps {
   isTyping: boolean;
   onUpdateTransaction: (updated: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
-  onClarificationSelect: (answer: string) => void;
+  onClarificationSelect: (pergunta_id: string, campo_faltante: 'valor' | 'categoria', answer: string) => void;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
@@ -99,17 +99,17 @@ export const MessageList: React.FC<MessageListProps> = ({
         const isLastAssistantMessage = index === messages.length - 1 && !isUser;
         
         let needsClarification = false;
-        let clarificationQuestion = msg.conteudo || '';
         let clarificationOptions: string[] | undefined = undefined;
+
+        let clarificationId: string | undefined = undefined;
+        let clarificationCampo: 'valor' | 'categoria' | undefined = undefined;
 
         if (isLastAssistantMessage) {
            if (msg.pergunta) {
              needsClarification = true;
-             clarificationQuestion = msg.pergunta.texto;
+             clarificationId = msg.pergunta.id;
+             clarificationCampo = msg.pergunta.campo_faltante;
              clarificationOptions = msg.pergunta.opcoes;
-           } else if (!msg.transaction_id && msg.conteudo?.includes('?')) {
-             needsClarification = true;
-             clarificationOptions = ['alimentacao', 'transporte', 'moradia', 'saude', 'lazer', 'compras', 'contas', 'outros'];
            }
         }
 
@@ -131,11 +131,11 @@ export const MessageList: React.FC<MessageListProps> = ({
               />
             )}
 
-            {needsClarification && (
+            {needsClarification && clarificationId && clarificationCampo && (
               <ClarificationCard 
-                question={clarificationQuestion}
+                campo_faltante={clarificationCampo}
                 options={clarificationOptions}
-                onSelect={onClarificationSelect}
+                onSelect={(answer) => onClarificationSelect(clarificationId!, clarificationCampo!, answer)}
               />
             )}
           </div>

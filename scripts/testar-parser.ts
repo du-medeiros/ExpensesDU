@@ -1,10 +1,28 @@
 import fs from 'fs';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = 'http://127.0.0.1:54321';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 // Helper to calculate MAE
 const calculateMAE = (actual: number, expected: number) => Math.abs(actual - expected);
 
 async function main() {
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  // Try to sign in as user A (created in test-rls)
+  const { data: authData, error: authErr } = await client.auth.signInWithPassword({
+    email: 'usera@example.com',
+    password: 'password123'
+  });
+
+  let jwt = process.env.SUPABASE_ANON_KEY;
+  if (authData?.session?.access_token) {
+    jwt = authData.session.access_token;
+  } else {
+    console.warn("Could not authenticate, trying to proceed with anon key or env... ", authErr?.message);
+  }
   const datasetPath = path.join(process.cwd(), 'scripts', 'dataset.json');
   const datasetRaw = fs.readFileSync(datasetPath, 'utf8');
   const dataset = JSON.parse(datasetRaw);
@@ -25,12 +43,14 @@ async function main() {
       const response = await fetch('http://127.0.0.1:54321/functions/v1/interpretar', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
         },
         body: JSON.stringify({
           texto: item.texto,
           dataCliente: today,
-          timezone: 'America/Sao_Paulo'
+          timezone: 'America/Sao_Paulo',
+          client_message_id: 'test-' + Math.random().toString(36).substring(7)
         })
       });
 

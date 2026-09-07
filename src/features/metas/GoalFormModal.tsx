@@ -37,9 +37,14 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
     if (!categoria || isNaN(val) || val <= 0) return;
 
     setIsSubmitting(true);
-    await onSubmit(categoria, val);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      await onSubmit(categoria, val);
+      onClose();
+    } catch (error) {
+      // Error handled by parent
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

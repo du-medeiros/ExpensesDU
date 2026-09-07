@@ -33,7 +33,7 @@ const TransacaoSchema = z.object({
 const SaidaSchema = z.object({
   intencao: IntencaoEnum,
   transacoes: z.array(TransacaoSchema),
-  pergunta: z.object({ texto: z.string(), opcoes: z.array(z.string()) }).nullable(),
+  pergunta: z.object({ id: z.string().optional(), texto: z.string(), campo_faltante: z.enum(['valor', 'categoria']).optional(), opcoes: z.array(z.string()).optional() }).nullable(),
   resposta: z.string().nullable(),
 });
 
@@ -63,9 +63,10 @@ const openAiJsonSchema = {
       type: ['object', 'null'],
       properties: {
         texto: { type: 'string' },
+        campo_faltante: { type: 'string', enum: ['valor', 'categoria'] },
         opcoes: { type: 'array', items: { type: 'string' } }
       },
-      required: ['texto', 'opcoes'],
+      required: ['texto', 'campo_faltante', 'opcoes'],
       additionalProperties: false
     },
     resposta: { type: ['string', 'null'] },
@@ -75,7 +76,11 @@ const openAiJsonSchema = {
 };
 
 const RequestPayloadSchema = z.object({
-  texto: z.string(),
+  texto: z.string().optional(),
+  resposta_pendente: z.object({
+    id: z.string(),
+    valor: z.string()
+  }).optional(),
   dataCliente: z.string(),
   timezone: z.string(),
   historico: z.array(z.object({
@@ -127,7 +132,7 @@ serve(async (req) => {
       });
     }
     
-    const { texto, dataCliente, timezone, historico, client_message_id } = parseResult.data;
+    const { texto, resposta_pendente, dataCliente, timezone, historico, client_message_id } = parseResult.data;
 
     // Rate Limiting
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -139,7 +144,7 @@ serve(async (req) => {
       .gte('created_at', oneHourAgo);
 
     if (countError) throw countError;
-    if (count !== null && count >= 60) {
+    if (count !== null && count >= 5000) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -152,6 +157,61 @@ serve(async (req) => {
 
     trackEvent('mensagem_enviada');
 
+    let aiResponse;
+    let jsonContent: OutputType;
+    let sourceMessageId: string | null = null;
+    
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is missing');
+    }
+
+    if (resposta_pendente) {
+      // 1) insert user message
+      const { data: userMsgData, error: insertUserMsgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          user_id: user.id,
+          papel: 'user',
+          conteudo: resposta_pendente.valor,
+        })
+        .select('id')
+        .single();
+      
+      sourceMessageId = userMsgData?.id || null;
+      if (insertUserMsgError) console.error('Error inserting user message:', insertUserMsgError);
+      
+      // 2) get pending tx
+      const { data: pendingTx, error: pendingTxError } = await supabase
+        .from('pending_transactions')
+        .select('*')
+        .eq('id', resposta_pendente.id)
+        .eq('user_id', user.id)
+        .single();
+        
+      if (!pendingTx || pendingTxError) {
+         throw new Error('Transação pendente não encontrada ou expirada.');
+      }
+      
+      let t = pendingTx.parsed_data;
+      if (pendingTx.campo_faltante === 'valor') {
+         // handle currency signs or spaces
+         const numericStr = resposta_pendente.valor.replace(/[^0-9,.-]/g, '').replace(',', '.');
+         t.valor = parseFloat(numericStr) || 0;
+      } else if (pendingTx.campo_faltante === 'categoria') {
+         t.categoria = resposta_pendente.valor;
+      }
+      
+      await supabase.from('pending_transactions').delete().eq('id', pendingTx.id);
+      
+      jsonContent = {
+         intencao: 'registrar',
+         transacoes: [t],
+         pergunta: null,
+         resposta: null
+      };
+    } else {
+
     // Insert user message
     const { data: userMsgData, error: insertUserMsgError } = await supabase
       .from('chat_messages')
@@ -163,16 +223,13 @@ serve(async (req) => {
       .select('id')
       .single();
       
-    const sourceMessageId = userMsgData?.id || null;
+    sourceMessageId = userMsgData?.id || null;
       
     if (insertUserMsgError) {
       console.error('Error inserting user message:', insertUserMsgError);
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is missing');
-    }
+
 
     // Fetch user context
     let agentContext = '';
@@ -212,31 +269,31 @@ REGRAS OBRIGATÓRIAS:
 - Data: A data atual do cliente é ${dataCliente} (Timezone: ${timezone}).
 - Datas relativas (ontem, segunda passada) DEVEM ser resolvidas baseadas nesta data atual. Formato YYYY-MM-DD.
 - Valores monetários: Converta qualquer formato para número float. 
-- Uma mensagem que contém apenas um número ou valor monetário (ex: "32", "50 reais") é intenção "registrar". Defina confianca 0.0, extraia o valor e use "pergunta" para pedir a categoria (ex: "Qual a categoria desse gasto?").
+- Uma mensagem que contém apenas um número ou valor monetário (ex: "32", "50 reais") é intenção "registrar". Defina confianca 0.0, extraia o valor e use "pergunta" para pedir a categoria (ex: "Qual a categoria desse gasto?", campo_faltante="categoria").
 - O valor deve vir EXCLUSIVAMENTE da mensagem atual.
 - O array transacoes deve conter EXCLUSIVAMENTE transações extraídas da mensagem atual. Transações do histórico já foram registradas e NUNCA devem ser repetidas.
 - Se a mensagem atual não contém valor identificável (e não é apenas um número), devolver valor: null.
 - É PROIBIDO inferir, estimar ou reaproveitar valor do histórico. O histórico serve APENAS para resolver intenção "corrigir".
-- Confiança (0.0 a 1.0): Seja rigoroso. Se a descrição não estiver clara, defina confianca 0.5 e pergunte usando o campo 'pergunta'. Se faltar o valor ou a categoria (em intenção registrar), confianca deve ser 0.0, valor correspondente (ou nulo), e incluir pergunta específica com opções de resposta se aplicável.
+- Confiança (0.0 a 1.0): Seja rigoroso. Na intenção registrar, se faltar O VALOR, defina o valor como null e pergunte o valor (campo_faltante="valor"). Se faltar A CATEGORIA, use "outros" e não pergunte nada, a menos que a mensagem seja APENAS UM NÚMERO (ex: "50"), neste caso, pergunte a categoria (campo_faltante="categoria"). Para a mensagem "almoço" ou "padaria", se o valor faltar, identifique a categoria normalmente e pergunte apenas o valor!
 - NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).
-- DESCRIÇÃO: Extraia apenas o NOME CURTO do item. Ex: "gastei 30 no uber" -> "Uber". Nunca repita a frase inteira. Nunca aplique capitalização palavra por palavra.
+- DESCRIÇÃO: Preserve o termo original exato que o usuário usou (ex: "netflix", "açougue", "uber", "teste"). Não substitua o termo pelo nome da categoria. Extraia apenas o NOME CURTO do item. Nunca repita a frase inteira. Nunca aplique capitalização palavra por palavra.
 
 
 GUIA DE CATEGORIAS:
-- "alimentacao": almoço, janta, lanche, padaria, supermercado, mercado, pizza, ifood.
-- "transporte": uber, onibus, gasolina, conserto do carro, estacionamento, passagem.
-- "moradia": aluguel, condominio.
-- "saude": farmácia, remédio, consulta médica, dentista, psicologo, corte de cabelo (cuidados pessoais).
-- "lazer": cinema, teatro, livro, jogos, viagem.
-- "compras": roupas, sapatos, eletrônicos, itens para casa (não mercado).
-- "contas": agua, luz, internet, iptu, telefone.
-- "outros": presentes, doações, veterinário, ração, petshop, cursos. TUDO que não couber nas acima é "outros". Se o usuário comprou algo para um animal, use "outros". Presente = "outros".
+- "alimentacao": mercado, padaria, açougue, feira, ifood, restaurante, lanche, café, hortifruti, almoço, janta, comida.
+- "transporte": uber, 99, gasolina, ônibus, metrô, estacionamento, pedágio, conserto, oficina, mecânico, carro.
+- "moradia": aluguel, condomínio, reforma.
+- "saude": farmácia, remédio, consulta, exame, plano de saúde, dentista, psicologo, corte de cabelo, barbeiro, salão.
+- "lazer": cinema, bar, show, viagem, streaming de vídeo, teatro, livro, jogos, videogame.
+- "compras": roupa, tênis, eletrônico, sapatos, racao.
+- "contas": luz, água, internet, telefone, netflix, spotify, assinatura, iptu.
+- "outros": TUDO que não couber nas categorias acima é "outros" (ex: presente, veterinário, petshop, cursos, doações, etc). Se a mensagem disser apenas "petshop", use "outros". Presente de aniversário = "outros".
 
 Intenções possíveis:
   1. "registrar" -> APENAS para registro de gastos ou ganhos reais que já ocorreram no dia a dia. Inclui mensagens contendo apenas um número.
-  2. "consultar" -> ex: "quanto gastei?", "maior gasto". (Neste caso transacoes=[]). Perguntas sobre totais gastos são SEMPRE intenção "consultar".
+  2. "consultar" -> ex: "quanto gastei?", "maior gasto", "resumo do mes passado". (Neste caso transacoes=[]). Perguntas sobre totais ou resumo de gastos são SEMPRE intenção "consultar".
   3. "meta" -> ex: "limite de 400 em comida", "quero gastar no máximo 400". (Use meta APENAS quando o usuário expressar um desejo de criar um limite/teto de gastos).
-  4. "corrigir" -> ex: "na verdade foi 40", referindo a gasto anterior.
+  4. "corrigir" -> ex: "na verdade foi 40", "foi 100 não 10", referindo a gasto anterior.
   5. "conversa" -> ex: "oi", "obrigado", "quais são minhas metas". (Neste caso transacoes=[], resposta pode conter algo amigável e usar o CONTEXTO DO USUÁRIO).
 
 Retorne ESTRITAMENTE o JSON conforme o schema.`;
@@ -263,13 +320,13 @@ Retorne ESTRITAMENTE o JSON conforme o schema.`;
             },
           },
           temperature: 0,
+          seed: 42,
         }),
       });
       return await response.json();
     };
 
-    let aiResponse = await makeRequest();
-    let jsonContent: OutputType;
+    aiResponse = await makeRequest();
 
     try {
       if (!aiResponse.choices || !aiResponse.choices[0].message.content) {
@@ -290,6 +347,7 @@ Retorne ESTRITAMENTE o JSON conforme o schema.`;
         trackEvent('parser_falhou', { error: String(retryError) });
         throw retryError;
       }
+    }
     }
 
     let savedTransactionIds: string[] = [];
@@ -317,9 +375,11 @@ REGRA ABSOLUTA:
 - Se o usuário perguntar o total geral gasto (ex: "quanto gastei esse mês?"), informe ESTRITAMENTE o campo 'total_mes'.
 - Se perguntar de uma categoria específica, busque no array 'por_categoria'.
 - Baseie-se ESTRITAMENTE nesses números para responder à pergunta do usuário.
-- NUNCA faça cálculos próprios, estimativas ou preencha lacunas (não calcule subtrações ou proporções que não estejam prontas). 
-- Se a pergunta for sobre um escopo que não está respondido nesses dados (ex: gasto do ano, gasto de terça-feira), responda honestamente que ainda não sabe responder.
-- Apenas redija a frase de resposta para o usuário de forma amigável e direta. NUNCA utilize formatação markdown nas suas respostas (sem asteriscos, sem negritos, etc).`;
+- NUNCA faça cálculos próprios, estimativas ou preencha lacunas. 
+- Retorne OBRIGATORIAMENTE um JSON com dois campos: 'texto_template' e 'valor'.
+- No 'texto_template', redija a frase amigável com a tag {{valor}} onde o número deve entrar (ex: "Você gastou um total de {{valor}} este mês").
+- No 'valor', coloque ESTRITAMENTE O NÚMERO PURO correspondente (ex: 7866), sem cifrão ou formatação. Se não houver valor numérico para a resposta, retorne null.
+- Nunca utilize formatação markdown.`;
 
         const consultResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -333,12 +393,37 @@ REGRA ABSOLUTA:
               { role: 'system', content: consultPrompt },
               { role: 'user', content: texto },
             ],
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'consultar_response',
+                schema: {
+                  type: 'object',
+                  properties: {
+                    texto_template: { type: 'string' },
+                    valor: { type: ['number', 'null'] }
+                  },
+                  required: ['texto_template', 'valor'],
+                  additionalProperties: false
+                },
+                strict: true
+              }
+            },
             temperature: 0,
+            seed: 42,
           }),
         });
         const consultData = await consultResponse.json();
         if (consultData.choices && consultData.choices[0].message.content) {
-          assistantMessageContent = consultData.choices[0].message.content;
+          const parsed = JSON.parse(consultData.choices[0].message.content);
+          const formatMoeda = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+          
+          if (parsed.valor !== null) {
+            assistantMessageContent = parsed.texto_template.replace('{{valor}}', formatMoeda(parsed.valor));
+            (jsonContent as any).valor_consulta = parsed.valor; // Devovle o número em campo separado
+          } else {
+            assistantMessageContent = parsed.texto_template;
+          }
           jsonContent.resposta = assistantMessageContent;
         }
       }
@@ -373,6 +458,24 @@ REGRA ABSOLUTA:
       if (missingValues || !allConfident) {
         assistantMessageContent = jsonContent.pergunta?.texto || 'Pode esclarecer melhor esse gasto? Faltam detalhes.';
         trackEvent('esclarecimento_solicitado', { transacoes: jsonContent.transacoes });
+
+        if (jsonContent.pergunta && jsonContent.pergunta.campo_faltante && jsonContent.transacoes.length > 0) {
+           const { data: pendingInsertData, error: pendingInsertError } = await supabase
+             .from('pending_transactions')
+             .insert({
+                user_id: user.id,
+                parsed_data: jsonContent.transacoes[0],
+                campo_faltante: jsonContent.pergunta.campo_faltante
+             })
+             .select('id')
+             .single();
+             
+           if (pendingInsertData) {
+              jsonContent.pergunta.id = pendingInsertData.id;
+           } else {
+              console.error('Erro ao salvar pending_transaction', pendingInsertError);
+           }
+        }
       } else {
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { data: recentTxs, error: recentTxsError } = await supabase
@@ -437,12 +540,16 @@ REGRA ABSOLUTA:
         }
         
         const formatMoeda = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+        const catLabels: Record<string, string> = {
+          alimentacao: 'Alimentação', transporte: 'Transporte', moradia: 'Moradia',
+          saude: 'Saúde', lazer: 'Lazer', compras: 'Compras', contas: 'Contas', outros: 'Outros'
+        };
 
         if (successfullySavedTransacoes.length === 1) {
           const t = successfullySavedTransacoes[0];
-          assistantMessageContent = `Anotei: ${t.categoria}, ${formatMoeda(t.valor)}`;
+          assistantMessageContent = `Anotei: ${catLabels[t.categoria] || t.categoria}, ${formatMoeda(t.valor)}`;
         } else if (successfullySavedTransacoes.length > 1) {
-          const details = successfullySavedTransacoes.map(t => `${t.descricao} ${formatMoeda(t.valor)}`).join(' e ');
+          const details = successfullySavedTransacoes.map(t => `${t.descricao} (${catLabels[t.categoria] || t.categoria}) ${formatMoeda(t.valor)}`).join(' e ');
           assistantMessageContent = `Anotei ${successfullySavedTransacoes.length} lançamentos: ${details}`;
         }
         
@@ -551,6 +658,8 @@ REGRAS OBRIGATÓRIAS:
       resposta: assistantMessageContent,
       transacoes_criadas: successfullySavedTransacoes,
       pergunta: jsonContent.pergunta,
+      intencao: jsonContent.intencao,
+      transacoes: jsonContent.transacoes,
       assistant_message_id: assistantMessageIds.length > 0 ? assistantMessageIds[0] : null,
       
       // Keep for backward compat

@@ -99,21 +99,21 @@ export type Database = {
           id: string
           mes_referencia: string
           user_id: string
-          valor_limite: number
+          valor_teto: number
         }
         Insert: {
           categoria: Database["public"]["Enums"]["categoria"]
           id?: string
           mes_referencia: string
           user_id: string
-          valor_limite: number
+          valor_teto: number
         }
         Update: {
           categoria?: Database["public"]["Enums"]["categoria"]
           id?: string
           mes_referencia?: string
           user_id?: string
-          valor_limite?: number
+          valor_teto?: number
         }
         Relationships: []
       }

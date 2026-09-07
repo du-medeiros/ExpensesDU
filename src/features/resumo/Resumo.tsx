@@ -91,11 +91,14 @@ export const Resumo: React.FC = () => {
   const totalMesAnterior = data?.total_mes_anterior || 0;
   
   let variacao = 0;
+  let hasValidBase = false;
   if (totalMesAnterior > 0) {
     variacao = ((totalDespesas - totalMesAnterior) / totalMesAnterior) * 100;
-  } else if (totalDespesas > 0 && totalMesAnterior === 0) {
-    variacao = 100;
+    hasValidBase = true;
   }
+  
+  if (variacao > 999) variacao = 999;
+  if (variacao < -999) variacao = -999;
 
   const isEmpty = totalDespesas === 0 && totalReceitas === 0;
 
@@ -157,15 +160,19 @@ export const Resumo: React.FC = () => {
                 </div>
                 <p className="text-xl font-bold text-foreground tabular-nums">{formatCurrency(totalDespesas)}</p>
                 <div className={`mt-2 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    variacao > 0 
+                    hasValidBase && variacao > 0 
                       ? 'text-estouro bg-estouro/10' 
-                      : variacao < 0 
+                      : hasValidBase && variacao < 0 
                         ? 'text-receita bg-receita/10' 
                         : 'text-muted-foreground bg-muted'
                   }`}
                 >
-                  {variacao > 0 ? <TrendingUp className="w-3 h-3" /> : variacao < 0 ? <TrendingDown className="w-3 h-3" /> : null}
-                  {variacao === 0 ? 'Igual anterior' : `${Math.abs(variacao).toFixed(0)}%`}
+                  {hasValidBase && variacao > 0 ? <TrendingUp className="w-3 h-3" /> : hasValidBase && variacao < 0 ? <TrendingDown className="w-3 h-3" /> : null}
+                  {!hasValidBase 
+                    ? 'Sem base de comp.' 
+                    : variacao === 0 
+                      ? 'Igual anterior' 
+                      : `${variacao > 0 ? '+' : ''}${variacao.toFixed(0)}%`}
                 </div>
               </div>
             </div>
@@ -198,10 +205,14 @@ export const Resumo: React.FC = () => {
                         itemStyle={{ color: 'var(--color-foreground)' }}
                       />
                       <Legend 
-                        layout="horizontal" 
                         verticalAlign="bottom" 
-                        align="center"
-                        formatter={(value) => <span className="text-foreground">{getCategoryName(value)}</span>}
+                        height={36} 
+                        iconType="circle"
+                        formatter={(value, entry: any) => {
+                          const catName = getCategoryName(value as any);
+                          const totalCat = entry.payload?.payload?.total || entry.payload?.total || 0;
+                          return <span className="text-foreground">{`${catName} (${formatCurrency(totalCat)})`}</span>;
+                        }}
                       />
                     </PieChart>
                   </ResponsiveContainer>

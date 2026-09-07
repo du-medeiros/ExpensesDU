@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type { Database } from '../types/database';
 
 export type Transaction = Omit<Database['public']['Tables']['transactions']['Row'], 'valor'> & { valor: number };
-export type Goal = Omit<Database['public']['Tables']['goals']['Row'], 'valor_limite'> & { valor_teto: number, gasto_atual: number };
+export type Goal = Omit<Database['public']['Tables']['goals']['Row'], 'valor_teto'> & { valor_teto: number, gasto_atual: number };
 
 // Helper para converter com segurança
 const parseNumeric = (val: any): number => {

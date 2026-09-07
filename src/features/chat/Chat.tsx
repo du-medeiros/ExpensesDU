@@ -236,6 +236,83 @@ export const Chat: React.FC = () => {
     }
   };
 
+  const handleSendClarification = async (pergunta_id: string, _campo_faltante: 'valor' | 'categoria', answer: string) => {
+    if (!user) return;
+    
+    const clientMsgId = crypto.randomUUID();
+    const userMsg: ChatMessageWithTransaction = {
+      id: clientMsgId,
+      user_id: user.id,
+      papel: 'user',
+      conteudo: answer,
+      transaction_id: null,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/interpretar`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            resposta_pendente: { id: pergunta_id, valor: answer },
+            dataCliente: new Date().toISOString().split('T')[0],
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            client_message_id: clientMsgId
+          }),
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error('Erro ao processar esclarecimento.');
+      }
+
+      const result = await response.json();
+      
+      const mainTx = result.transacoes_criadas && result.transacoes_criadas.length > 0 ? result.transacoes_criadas[0] : null;
+      if (mainTx) {
+         mainTx.valor = typeof mainTx.valor === 'string' ? parseFloat(mainTx.valor) : (mainTx.valor || 0);
+      }
+      
+      const mainAssistantMsg: ChatMessageWithTransaction = {
+        id: result.assistant_message_id || crypto.randomUUID(),
+        user_id: user.id,
+        papel: 'assistant',
+        conteudo: result.resposta,
+        transaction_id: mainTx ? mainTx.id : null,
+        created_at: new Date().toISOString(),
+        transaction: mainTx,
+        pergunta: result.pergunta || null,
+      };
+
+      setMessages(prev => [...prev, mainAssistantMsg]);
+
+    } catch (error: any) {
+      console.error('Clarification error:', error);
+      setMessages(prev => prev.filter(m => m.id !== clientMsgId));
+      toast.error('Erro ao enviar esclarecimento.');
+    } finally {
+      setIsTyping(false);
+      inputRef.current?.focus();
+    }
+  };
+
   const handleUpdateTransaction = (updated: Transaction) => {
     setMessages(prev => prev.map(msg => {
       if (msg.transaction_id === updated.id) {
@@ -310,7 +387,7 @@ export const Chat: React.FC = () => {
           isTyping={isTyping}
           onUpdateTransaction={handleUpdateTransaction}
           onDeleteTransaction={handleDeleteTransaction}
-          onClarificationSelect={(answer) => handleSend(answer)}
+          onClarificationSelect={handleSendClarification}
           hasMore={hasMore}
           loadingMore={loadingMore}
           onLoadMore={handleLoadMore}
